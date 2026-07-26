@@ -43,6 +43,30 @@ a fresh envelope rather than matching a stale already-answered one:
 | `touchpoint-2-round-1` | Brief sign-off | First presentation |
 | `touchpoint-2-round-2`, … | Brief sign-off | After "Edit" |
 
+**Determining the current round on resume.** Unlike kickoff/plan's phases (each
+asked at most once per invocation, so linear script order alone tells the skill
+where it is), a touchpoint's round number is not derivable from control flow
+alone when `/design` is resumed as a **fresh process** — the round state lives only
+in `.pHive/questions/`, not in any other persisted file. On every resume (including
+the very first attempt at a touchpoint), determine the round to use by probing
+starting at round 1:
+
+1. Call `find_envelope_for_phase(skill="design", phase="touchpoint-<N>-round-1")`.
+2. If no envelope exists yet, this is a fresh touchpoint — use round 1.
+3. If an envelope exists and is `answered`:
+   - Selection/approval answer ("Rendition K" / "Approve") → the touchpoint is
+     resolved; do not open a new round.
+   - Iteration answer ("Request changes" / "More options" / "Edit") → advance to
+     round 2 and repeat this probe (`find_envelope_for_phase` for
+     `touchpoint-<N>-round-2`), continuing until an unanswered or nonexistent round
+     is found.
+4. If an envelope exists and is still `pending`, that round is the current one —
+   resume there (per Headless Mode above), don't start a new round.
+
+This probe is O(rounds so far), which is bounded in practice (iteration loops don't
+run indefinitely) and mirrors how the gateway itself already resolves a single
+phase — it's just applied repeatedly across the round sequence.
+
 ## When This Runs
 
 Whenever `/hive:design` runs — either standalone or delegated from `/hive:plan` during planning of a net-new UI story. The UI designer agent runs through the touchpoints below; wireframes are produced and approved **before** stories are finalized so by execution time developers already have the approved design context.

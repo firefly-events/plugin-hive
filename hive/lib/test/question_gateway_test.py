@@ -9,6 +9,7 @@ from hive.lib.question_gateway import (
     HeadlessConfig,
     QuestionDeadlineExpiredError,
     ask_or_emit,
+    envelope_path,
     find_envelope_for_phase,
     renew_envelope,
     write_envelope,
@@ -109,6 +110,36 @@ class QuestionGatewayTests(unittest.TestCase):
         # renewal hadn't extended the deadline past the original one.
         self.assertFalse(result["resolved"])
         self.assertEqual(result["status"], "pending")
+
+    def test_envelope_ids_do_not_collide_within_the_same_wall_clock_second(self) -> None:
+        # Regression for CodeRabbit review (PR #341): whole-second invocation
+        # ids meant two writes in the same second for the same skill (but
+        # different phases) silently overwrote each other on disk.
+        now = datetime(2026, 7, 25, 22, 10, 0, 100000, tzinfo=timezone.utc)
+        later_same_second = datetime(2026, 7, 25, 22, 10, 0, 900000, tzinfo=timezone.utc)
+        _, path_a = write_envelope("kickoff", "1a", QUESTIONS, base_dir=self.base_dir, now=now)
+        _, path_b = write_envelope("kickoff", "1b", QUESTIONS, base_dir=self.base_dir, now=later_same_second)
+        self.assertNotEqual(path_a, path_b)
+        candidates = sorted(self.base_dir.glob("kickoff-*.yaml"))
+        self.assertEqual(len(candidates), 2)
+
+    def test_skill_component_is_sanitized_in_the_envelope_path(self) -> None:
+        # Regression for CodeRabbit review (PR #341): only invocation_id was
+        # slugged, not skill.
+        path = envelope_path("weird/skill name", "2026-07-25T22-10-00-000Z", base_dir=self.base_dir)
+        self.assertNotIn("/", path.name)
+        self.assertEqual(path.parent, self.base_dir)
+
+    def test_malformed_envelope_raises_instead_of_being_treated_as_missing(self) -> None:
+        # Regression for CodeRabbit review (PR #341): a non-dict-shaped (or
+        # unparseable) envelope must surface an error, not be silently
+        # treated as "no envelope" — that conflation would let a caller
+        # write a duplicate envelope over corrupted state.
+        now = datetime(2026, 7, 25, 22, 10, 0, tzinfo=timezone.utc)
+        _, path = write_envelope("kickoff", "1a", QUESTIONS, base_dir=self.base_dir, now=now)
+        path.write_text("- just\n- a\n- list\n", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            find_envelope_for_phase("kickoff", "1a", base_dir=self.base_dir)
 
     def test_answered_status_with_missing_required_answer_is_treated_as_pending(self) -> None:
         now = datetime(2026, 7, 25, 22, 10, 0, tzinfo=timezone.utc)

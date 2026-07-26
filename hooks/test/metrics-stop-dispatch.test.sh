@@ -151,6 +151,30 @@ else
   fail "events file was not written for the size-guard skip case ($EVENTS_FILE_3)"
 fi
 
+# --- test 4: non-numeric config value falls back to the default, not a ------
+# --- silently-disabled guard (CodeRabbit review, PR #341) -------------------
+CONFIG_DIR_4="$TMPDIR_BASE/proj4"
+mkdir -p "$CONFIG_DIR_4"
+cat >"$CONFIG_DIR_4/hive.config.yaml" <<EOF
+metrics:
+  enabled: true
+  stop_dispatch_max_transcript_bytes: "not-a-number"
+EOF
+
+SESSION_4="test-session-bad-config"
+_run_hook "$SESSION_4" "$CONFIG_DIR_4"
+EVENTS_FILE_4="$CONFIG_DIR_4/.pHive/metrics/events/stop-${SESSION_4}.jsonl"
+if [[ -f "$EVENTS_FILE_4" ]]; then
+  TOKEN_ROW_4=$(grep '"metric_type":"tokens"' "$EVENTS_FILE_4" | head -1)
+  if [[ -n "$TOKEN_ROW_4" ]]; then
+    pass "non-numeric stop_dispatch_max_transcript_bytes falls back to the 300MB default (normal-size fixture still parses)"
+  else
+    fail "non-numeric config value broke the token parse instead of falling back to the default"
+  fi
+else
+  fail "events file was not written when stop_dispatch_max_transcript_bytes was non-numeric ($EVENTS_FILE_4)"
+fi
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]]

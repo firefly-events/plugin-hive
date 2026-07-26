@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   QuestionDeadlineExpiredError,
   askOrEmit,
+  envelopePath,
   findEnvelopeForPhase,
   renewEnvelope,
   writeEnvelope,
@@ -139,6 +140,38 @@ describe('question_gateway', () => {
     // Would have thrown under FAIL_CFG if renewal hadn't extended the deadline.
     expect(result.resolved).toBe(false);
     expect(result.status).toBe('pending');
+  });
+
+  it('does not collide envelope filenames within the same wall-clock second', () => {
+    // Regression for CodeRabbit review (PR #341): whole-second invocation ids
+    // meant two writes in the same second for the same skill (different
+    // phases) silently overwrote each other on disk.
+    const now = new Date('2026-07-25T22:10:00.100Z');
+    const laterSameSecond = new Date('2026-07-25T22:10:00.900Z');
+    const a = writeEnvelope({ skill: 'kickoff', phase: '1a', questions: QUESTIONS, baseDir, now });
+    const b = writeEnvelope({ skill: 'kickoff', phase: '1b', questions: QUESTIONS, baseDir, now: laterSameSecond });
+    expect(a.path).not.toBe(b.path);
+    const candidates = fs.readdirSync(baseDir).filter((f) => f.startsWith('kickoff-'));
+    expect(candidates).toHaveLength(2);
+  });
+
+  it('sanitizes the skill component in the envelope path', () => {
+    // Regression for CodeRabbit review (PR #341): only invocationId was
+    // slugged, not skill.
+    const p = envelopePath('weird/skill name', '2026-07-25T22-10-00-000Z', baseDir);
+    expect(path.basename(p)).not.toMatch(/\//);
+    expect(path.dirname(p)).toBe(baseDir);
+  });
+
+  it('throws on a malformed envelope instead of treating it as missing', () => {
+    // Regression for CodeRabbit review (PR #341): a non-object (or
+    // unparseable) envelope must surface an error, not be silently treated
+    // as "no envelope" — that conflation would let a caller write a
+    // duplicate envelope over corrupted state.
+    const now = new Date('2026-07-25T22:10:00Z');
+    const { path: envPath } = writeEnvelope({ skill: 'kickoff', phase: '1a', questions: QUESTIONS, baseDir, now });
+    fs.writeFileSync(envPath, '- just\n- a\n- list\n', 'utf8');
+    expect(() => findEnvelopeForPhase('kickoff', '1a', baseDir)).toThrow();
   });
 
   it('treats status:answered with a missing required answer as still pending (closure invariant)', () => {

@@ -42,8 +42,16 @@ headings):
 | `scenario-detect` | Step 1: Detect Scenario | The rare "ambiguous brownfield vs greenfield" prompt |
 | `1a` | Step 1a: Metrics Opt-In / Preservation | Fresh opt-in OR re-kickoff change prompt (same phase id either way — mutually exclusive paths) |
 | `1b` | Step 1b: Ship Target Elicitation / Preservation | Fresh elicitation OR re-kickoff change prompt |
-| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | The 5-question elicitation block |
+| `project-classification` | `skills/kickoff/SKILL.md` only — not documented as a numbered Step in this file (see note below) | `project_type` + `has_ui` |
+| `2b-ii` | Phase 2b-ii: Developer Discovery, Step 2 | All 7 numbered elicitation items (the section is titled "5 Questions" but the actual prompt template presents 7 — see the note at that section) |
 | `4b` | Phase 4b: Scaffold CONTEXT.md | The backfill opt-in prompt |
+
+**`project-classification` note:** `skills/kickoff/SKILL.md` asks `project_type` and
+`has_ui` for every kickoff, but this protocol document has no corresponding numbered
+Step for them (verified: no "project_type"/"has_ui" text anywhere in this file) — a
+pre-existing gap between the two files, not introduced by this protocol. Registered
+here so the phase-id namespace stays centrally discoverable even though the
+underlying content lives only in `SKILL.md`.
 
 **Out of scope for this protocol:** Step 2B's greenfield **Product Discovery**
 (delegated to the analyst persona's Socratic conversation) is a multi-turn, free-form
@@ -364,10 +372,15 @@ Also infer a PR style default from recent git history:
 
 Present the questions as a single conversational block. The tone should feel like a colleague asking preferences, not a form to fill out.
 
-**Headless (phase `2b-ii` — see Headless Mode above):** batch all 5 questions (plus
-the inferred defaults as each question's implicit "accept default" option) into one
-`ask_or_emit()` call rather than presenting the conversational block. There is no
-headless equivalent of "press Enter to accept all" — an orchestrator answers each
+**Headless (phase `2b-ii` — see Headless Mode above):** batch all 7 questions — this
+section is titled "5 Questions" but the prompt template below actually presents 7
+numbered items (methodology, PR style, commit granularity, review depth,
+collaborative reviews, meta-team GitHub sync, notes), and Step 3 persists all 7;
+batching fewer would silently drop collaborative-reviews/GitHub-sync/notes from a
+headless kickoff (plus the inferred defaults as each question's implicit "accept
+default" option) into one `ask_or_emit()` call rather than presenting the
+conversational block. There is no headless equivalent of "press Enter to accept
+all" — an orchestrator answers each
 `qid` explicitly (it may simply echo back the inferred default as the answer, which
 has the same effect).
 

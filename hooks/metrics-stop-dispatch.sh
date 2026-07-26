@@ -80,6 +80,12 @@ METRICS_ENABLED=$(_read_metrics_config "enabled" "false")
 # 300MB default — benchmarked (hqp-6-stop-hook-bound): streaming pipeline
 # completes in ~3.1s at this size, ~12s margin under the 15s hook timeout.
 MAX_TRANSCRIPT_BYTES=$(_read_metrics_config "stop_dispatch_max_transcript_bytes" "314572800")
+# _read_metrics_config's own numeric fallback only fires on empty/null — a
+# non-numeric config value (typo, bad edit) would otherwise reach the -gt
+# comparison below unvalidated (CodeRabbit review, PR #341).
+case "$MAX_TRANSCRIPT_BYTES" in
+  ''|*[!0-9]*) MAX_TRANSCRIPT_BYTES=314572800 ;;
+esac
 STATE_DIR=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace and comment suffixes from yaml values

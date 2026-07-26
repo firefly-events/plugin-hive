@@ -102,7 +102,12 @@ def _slug(value: str) -> str:
 
 
 def _now_iso(now: datetime) -> str:
-    return now.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    # Millisecond precision (not truncated to whole seconds) — the invocation
+    # id derived from this is the on-disk filename component; whole-second
+    # resolution risked two envelope writes for the same skill within the
+    # same wall-clock second silently overwriting each other (CodeRabbit
+    # review, PR #341).
+    return now.astimezone(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def _parse_iso(value: str) -> datetime:
@@ -114,7 +119,7 @@ def _questions_dir(base_dir: str | Path | None) -> Path:
 
 
 def envelope_path(skill: str, invocation_id: str, base_dir: str | Path | None = None) -> Path:
-    return _questions_dir(base_dir) / f"{skill}-{_slug(invocation_id)}.yaml"
+    return _questions_dir(base_dir) / f"{_slug(skill)}-{_slug(invocation_id)}.yaml"
 
 
 def _write_yaml(path: Path, data: Mapping[str, Any]) -> None:
@@ -130,18 +135,34 @@ def _write_yaml(path: Path, data: Mapping[str, Any]) -> None:
 
 
 def _read_yaml(path: Path) -> dict[str, Any] | None:
+    """Returns None only when the file is absent. Raises ValueError when the
+    file exists but cannot be parsed into a mapping — a malformed envelope
+    must never be silently treated as "no envelope" (CodeRabbit review, PR
+    #341): that conflation would let a caller write a duplicate envelope over
+    a corrupted one instead of surfacing the corruption."""
     if not path.exists():
         return None
     raw = path.read_text(encoding="utf-8")
+    loaded: Any = None
+    parse_error: Exception | None = None
     try:
         import yaml  # type: ignore
 
         loaded = yaml.safe_load(raw)
-    except Exception:
-        import json
+    except Exception as exc:
+        parse_error = exc
+        try:
+            import json
 
-        loaded = json.loads(raw)
-    return loaded if isinstance(loaded, dict) else None
+            loaded = json.loads(raw)
+            parse_error = None
+        except Exception as json_exc:
+            parse_error = json_exc
+    if parse_error is not None:
+        raise ValueError(f"Envelope at {path} exists but could not be parsed as YAML or JSON: {parse_error}")
+    if not isinstance(loaded, dict):
+        raise ValueError(f"Envelope at {path} exists but did not parse to a mapping (got {type(loaded).__name__})")
+    return loaded
 
 
 def write_envelope(

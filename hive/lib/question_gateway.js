@@ -101,8 +101,13 @@ function slug(value) {
   return String(value).replace(/[^A-Za-z0-9._-]/g, '-');
 }
 
+// Millisecond precision (not truncated to whole seconds) — the invocation id
+// derived from this is the on-disk filename component; whole-second
+// resolution risked two envelope writes for the same skill within the same
+// wall-clock second silently overwriting each other (CodeRabbit review, PR
+// #341).
 function nowIso(date) {
-  return date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  return date.toISOString();
 }
 
 function questionsDir(baseDir) {
@@ -110,7 +115,7 @@ function questionsDir(baseDir) {
 }
 
 export function envelopePath(skill, invocationId, baseDir) {
-  return path.join(questionsDir(baseDir), `${skill}-${slug(invocationId)}.yaml`);
+  return path.join(questionsDir(baseDir), `${slug(skill)}-${slug(invocationId)}.yaml`);
 }
 
 function writeYaml(filePath, data) {
@@ -121,19 +126,39 @@ function writeYaml(filePath, data) {
   fs.writeFileSync(filePath, text, 'utf8');
 }
 
+/**
+ * Returns null only when the file is absent. Throws when the file exists but
+ * cannot be parsed into an object — a malformed envelope must never be
+ * silently treated as "no envelope" (CodeRabbit review, PR #341): that
+ * conflation would let a caller write a duplicate envelope over a corrupted
+ * one instead of surfacing the corruption.
+ */
 function readYaml(filePath) {
   if (!fs.existsSync(filePath)) return null;
   const raw = fs.readFileSync(filePath, 'utf8');
   let loaded;
+  let parseError = null;
   try {
     loaded = JSON.parse(raw);
-  } catch {
+  } catch (jsonErr) {
+    parseError = jsonErr;
     if (yaml) {
-      const loader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
-      loaded = loader(raw);
+      try {
+        const loader = typeof yaml.load === 'function' ? yaml.load : yaml.safeLoad;
+        loaded = loader(raw);
+        parseError = null;
+      } catch (yamlErr) {
+        parseError = yamlErr;
+      }
     }
   }
-  return loaded && typeof loaded === 'object' ? loaded : null;
+  if (parseError) {
+    throw new Error(`Envelope at ${filePath} exists but could not be parsed as YAML or JSON: ${parseError.message}`);
+  }
+  if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) {
+    throw new Error(`Envelope at ${filePath} exists but did not parse to an object`);
+  }
+  return loaded;
 }
 
 export function writeEnvelope({ skill, phase, questions, baseDir, deadlineSeconds, now }) {
