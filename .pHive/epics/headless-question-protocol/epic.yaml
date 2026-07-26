@@ -24,10 +24,13 @@ git_flow:
   # entirely. A test merge of main into develop deleted 1,461 files from develop
   # before being caught and reverted (never pushed). `develop` is the real
   # source-of-truth working branch (confirmed: it carries the correct
-  # per-epic .gitignore allowlist pattern this epic itself needed). The eventual
-  # PR targets whatever integration branch firefly-events/plugin-hive has set up
-  # upstream (their develop-equivalent, if one exists, else their main) — not
-  # assumed here; confirm at PR-open time.
+  # per-epic .gitignore allowlist pattern this epic itself needed).
+  #
+  # CONFIRMED (2026-07-26, hqp-7): fetched upstream directly — upstream/develop
+  # is bff42edf, byte-identical to origin/develop's tip at branch-creation time
+  # (same commit hash). upstream/main also lacks .gitignore/.github, confirming
+  # it's the same independently-synced "runtime export" pattern on the upstream
+  # side too. The PR targets firefly-events/plugin-hive's `develop` branch.
 
 planning_team:
   matched_tags: []
