@@ -45,6 +45,15 @@ paths:
 metrics:
   enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
 
+# Headless question protocol (epic headless-question-protocol, story
+# hqp-2-question-gateway-envelope). Governs .pHive/questions/ envelope
+# behavior when hive/lib/runtime_mode.{py,js} resolves headless. See
+# hive/references/question-envelope-schema.md for the full contract.
+headless:
+  answer_deadline_seconds: 1800   # renewable — matches this repo's existing
+                                   # Multica story/persona timeout precedents
+  deadline_expired_action: re-emit  # re-emit | fail
+
 # KG lifecycle emission granularity.
 # phase: emit lifecycle KG triples at phase boundaries (default, low volume).
 # story: emit at story boundaries.
