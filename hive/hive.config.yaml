@@ -44,6 +44,14 @@ paths:
 # adding `metrics: { enabled: true }` to their root `hive.config.yaml`.
 metrics:
   enabled: false              # opt-in only; no <state_dir>/metrics/events/*.jsonl writes when false
+  # Stop-hook transcript size guard (epic headless-question-protocol, story
+  # hqp-6-stop-hook-bound). Above this size, metrics-stop-dispatch.sh skips
+  # the token-extraction parse entirely (logs one skip row, exits 0) rather
+  # than attempting a parse whose cost scales with transcript size. Default
+  # benchmarked at ~3.1s wall time / ~12s margin under the 15s hook timeout
+  # — see hooks/metrics-stop-dispatch.sh's header comment for the full
+  # benchmark numbers.
+  stop_dispatch_max_transcript_bytes: 314572800  # 300MB
 
 # Headless question protocol (epic headless-question-protocol, story
 # hqp-2-question-gateway-envelope). Governs .pHive/questions/ envelope

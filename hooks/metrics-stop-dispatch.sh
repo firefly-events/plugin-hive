@@ -4,11 +4,25 @@
 # Reads `metrics.enabled` from the root `hive.config.yaml` and derives the
 # metrics events directory via `_resolve_state_dir` in `hooks/common.sh`
 # (`paths.state_dir` + `/metrics/events`, default `.pHive/metrics/events`).
-# If enabled, extracts token totals from the Claude Code JSONL transcript
-# (C2.0 chosen mechanism) and writes a story-end JSONL event to
-# `${state_dir}/metrics/events/`. If disabled, exits 0 silently.
+# If enabled, extracts token totals from the Claude Code JSONL transcript and
+# writes a story-end JSONL event to `${state_dir}/metrics/events/`. If
+# disabled, exits 0 silently.
 # Always exits 0 on internal failure (handler isolation — sentinel must not be
 # suppressed by any failure in this script).
+#
+# Token extraction (story hqp-6-stop-hook-bound, epic
+# headless-question-protocol): a single streaming jq | awk pipeline over the
+# JSONL transcript, O(1) memory in transcript size — replaced the original
+# `jq -c -s` (slurp) implementation, which loaded the ENTIRE transcript into
+# memory before aggregating (benchmarked: ~7.5GB peak RSS and 13.57s wall
+# time on an 884MB/3M-line synthetic transcript, right at the edge of the
+# 15s plugin.json hook timeout). The streaming pipeline processes the same
+# 884MB fixture in ~9.2s using ~2.8MB peak memory — see
+# .pHive/epics/headless-question-protocol/stories/hqp-6-stop-hook-bound.yaml
+# for the full benchmark. An in-script size guard (below) additionally skips
+# the parse entirely above `metrics.stop_dispatch_max_transcript_bytes`
+# (default 300MB, benchmarked at ~3.1s / ~12s margin under the timeout),
+# rather than relying solely on the harness-level timeout as a backstop.
 
 # No set -e: use per-line guards (|| exit 0) to avoid partial-write risk (I-4)
 set -uo pipefail
@@ -63,6 +77,9 @@ PYEOF
 
 # Read configuration
 METRICS_ENABLED=$(_read_metrics_config "enabled" "false")
+# 300MB default — benchmarked (hqp-6-stop-hook-bound): streaming pipeline
+# completes in ~3.1s at this size, ~12s margin under the 15s hook timeout.
+MAX_TRANSCRIPT_BYTES=$(_read_metrics_config "stop_dispatch_max_transcript_bytes" "314572800")
 STATE_DIR=$(_resolve_state_dir)
 
 # Strip leading/trailing whitespace and comment suffixes from yaml values
@@ -107,7 +124,49 @@ _resolve_transcript() {
 
 JSONL_PATH=$(_resolve_transcript)
 
-# Extract token totals from JSONL using C2.0 jq pipeline
+# Size guard (hqp-6-stop-hook-bound): skip the parse entirely above
+# MAX_TRANSCRIPT_BYTES rather than let cost scale unboundedly with
+# transcript size. Logs one skip row (not silent) and exits 0.
+_transcript_size_bytes() {
+  local jsonl="$1"
+  wc -c <"$jsonl" 2>/dev/null | tr -d ' '
+}
+
+if [ -n "$JSONL_PATH" ] && [ -f "$JSONL_PATH" ]; then
+  TRANSCRIPT_BYTES=$(_transcript_size_bytes "$JSONL_PATH")
+  if [ -n "${TRANSCRIPT_BYTES:-}" ] && [ "$TRANSCRIPT_BYTES" -gt "$MAX_TRANSCRIPT_BYTES" ] 2>/dev/null; then
+    SKIP_TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    SKIP_ROW=$(jq -nc \
+      --arg event_id "evt_$(date -u +%Y-%m-%dT%H%M%SZ)_$$_${RANDOM}_stop_skip" \
+      --arg ts "$SKIP_TS" \
+      --arg session_id "$SESSION_ID" \
+      --argjson bytes "$TRANSCRIPT_BYTES" \
+      --argjson threshold "$MAX_TRANSCRIPT_BYTES" \
+      '{
+        event_id: $event_id,
+        timestamp: $ts,
+        story_id: "session-end",
+        phase: "stop-hook",
+        agent: "stop-hook-dispatcher",
+        metric_type: "transcript_skipped",
+        value: $bytes,
+        unit: "bytes",
+        dimensions: { session_id: $session_id, threshold_bytes: $threshold },
+        source: "stop-hook-size-guard"
+      }' 2>/dev/null)
+    if [ -n "$SKIP_ROW" ]; then
+      EVENTS_FILE="$EVENTS_DIR/stop-${SESSION_ID:-unknown}.jsonl"
+      echo "$SKIP_ROW" >>"$EVENTS_FILE" || true
+    fi
+    exit 0
+  fi
+fi
+
+# Extract token totals from JSONL using a single streaming jq | awk pass —
+# see the file header comment for the benchmark that replaced the original
+# `jq -c -s` (slurp) implementation. jq without `-s` reads one JSON value at
+# a time (the transcript is already one object per line), keeping jq's own
+# memory bounded; awk's accumulator state is O(distinct models), not O(n).
 _extract_tokens() {
   local jsonl="$1"
   if [ -z "$jsonl" ] || [ ! -f "$jsonl" ]; then
@@ -115,18 +174,35 @@ _extract_tokens() {
     return
   fi
 
-  # Slurp mode for aggregation across all assistant rows (C2.0 edge case #4)
-  jq -c -s '
-    [.[] | select(.type == "assistant" and .message.usage != null)]
-    | {
-        input_tokens: (map(.message.usage.input_tokens // 0) | add // 0),
-        output_tokens: (map(.message.usage.output_tokens // 0) | add // 0),
-        cache_creation_input_tokens: (map(.message.usage.cache_creation_input_tokens // 0) | add // 0),
-        cache_read_input_tokens: (map(.message.usage.cache_read_input_tokens // 0) | add // 0),
-        model: ([ .[] | .message.model ] | unique | join(",")),
-        codex_gap: false
+  jq -r '
+    select(.type == "assistant" and .message.usage != null)
+    | [
+        (.message.usage.input_tokens // 0),
+        (.message.usage.output_tokens // 0),
+        (.message.usage.cache_creation_input_tokens // 0),
+        (.message.usage.cache_read_input_tokens // 0),
+        (.message.model // "unknown")
+      ]
+    | @tsv
+  ' "$jsonl" 2>/dev/null | awk -F'\t' '
+    {
+      input += $1; output += $2; cache_c += $3; cache_r += $4
+      if (!($5 in seen)) { seen[$5] = 1; n++; models[n] = $5 }
+    }
+    END {
+      # Insertion sort on the (tiny — bounded by distinct model count) models
+      # array, to match the original jq `unique` implementation'"'"'s sorted
+      # join order byte-for-byte.
+      for (i = 2; i <= n; i++) {
+        key = models[i]; j = i - 1
+        while (j >= 1 && models[j] > key) { models[j+1] = models[j]; j-- }
+        models[j+1] = key
       }
-  ' "$jsonl" 2>/dev/null || echo '{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"model":"unknown","codex_gap":true}'
+      joined = ""
+      for (i = 1; i <= n; i++) { joined = (joined == "" ? models[i] : joined "," models[i]) }
+      printf("{\"input_tokens\":%d,\"output_tokens\":%d,\"cache_creation_input_tokens\":%d,\"cache_read_input_tokens\":%d,\"model\":\"%s\",\"codex_gap\":false}\n", input, output, cache_c, cache_r, joined)
+    }
+  ' || echo '{"input_tokens":0,"output_tokens":0,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"model":"unknown","codex_gap":true}'
 }
 
 TOKENS_JSON=$(_extract_tokens "$JSONL_PATH")
