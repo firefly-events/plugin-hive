@@ -94,6 +94,36 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 5. Proceed with the rest of `/plan` after these defaults are in place.
 
+## Headless Mode
+
+Epic `headless-question-protocol`, story `hqp-5-plan-headless-integration`. This
+skill has two blocking prompt points: the branch-switch confirmation (Phase 0 step
+0) and step 14b's release-intent question. Before either, call
+`hive/lib/runtime_mode.{py,js}`'s `detect_interactive_mode()`.
+
+**Interactive** (`mode: "interactive"`): unchanged — prompt exactly as written at
+each site below.
+
+**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.{py,js}`'s
+`ask_or_emit(skill="plan", phase="<phase-id>", questions=[...])` instead. On
+`resolved: false`, print the `AWAITING_ANSWERS` status and stop this `/hive:plan`
+invocation here; the orchestrator answers the envelope and re-invokes `/hive:plan`,
+which resumes at this phase. On `resolved: true`, use the answer exactly as if typed
+interactively — including this skill's existing fallback/default logic for an
+unrecognized or missing answer (see step 14b below), which is unchanged by this
+protocol.
+
+| Phase id | Site |
+|---|---|
+| `branch-switch-confirm` | Phase 0 step 0 — confirm switching to `feat/{epic-id}` from a different `feat/*` branch |
+| `14b-version-bump` | Step 14b — release-intent question (`major \| minor \| patch \| none`) |
+
+**Correction from planning (story `hqp-5`):** the plan skill's sidecar-retention
+question (step 14c in a newer plugin release) is not present in this repo's current
+`skills/plan/SKILL.md` — only the branch-switch confirm and step 14b exist here. This
+protocol wires what actually exists; step 14c will need the same treatment when/if it
+lands on this branch.
+
 ## Process
 
 ### Phase 0: Assemble Planning Team
@@ -103,7 +133,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
    - Check the working tree first. If there are uncommitted changes, stop immediately with guidance to commit or stash before re-running `/hive:plan`. Do not create, switch, or write anything while the tree is dirty.
    - Read the current branch name.
    - If already on `feat/{epic-id}`, do nothing and continue.
-   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}`.
+   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}` (headless: phase `branch-switch-confirm` — see Headless Mode above).
    - If `feat/{epic-id}` already exists locally, check it out. Otherwise create it from the current HEAD and switch to it.
    - Only after `feat/{epic-id}` is active may the skill write planning artifacts such as the research brief, design discussion, H/V plans, structured outline, or story YAMLs.
 
@@ -669,7 +699,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-14b. **Capture release intent.** Ask the user exactly:
+14b. **Capture release intent.** Ask the user exactly (headless: phase `14b-version-bump` — see Headless Mode above):
 
     > Does this epic bump the version? major | minor | patch | none
 
