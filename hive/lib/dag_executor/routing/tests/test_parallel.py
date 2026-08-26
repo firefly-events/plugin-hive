@@ -108,6 +108,7 @@ class _SpawnRecorder:
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             {

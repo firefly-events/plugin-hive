@@ -236,7 +236,12 @@ class RLMRecursiveWrapper:
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
+        # Not consumed here — accepted only for Protocol parity with
+        # LocalAgentSpawn/StubAgentSpawn/MulticaAgentSpawn. The recursive
+        # sub-call below goes through its own registered binding, which has
+        # its own timeout semantics.
         context = _assemble_context(step_file_content, inputs)
         tools = ConstrainedContextTools(context)
         self.tools = tools

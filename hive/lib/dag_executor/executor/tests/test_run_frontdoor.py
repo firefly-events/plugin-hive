@@ -173,6 +173,7 @@ class _FailingSpawn:
         inputs: dict,
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict:
         raise AgentHandlerError("intentional spawn failure")
 

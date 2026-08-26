@@ -159,6 +159,30 @@ def _output_contract_closer(output_names: list[str]) -> str:
     )
 
 
+def _required_output_keys_footer(output_names: list[str]) -> str:
+    """Binding-agnostic footer stating the exact JSON keys a node's response
+    must contain.
+
+    Distinct from `_output_contract_preamble`/`_output_contract_closer`
+    above, which are about a Multica agent writing an `outputs.yaml` file
+    in its work_dir — a mechanism that doesn't apply to bindings (Local,
+    Session, Stub) that return their result directly as the `claude
+    --print` stdout JSON. Observed failure this closes: `build_prompt`'s
+    closing line told the agent to "respond with a JSON object whose keys
+    are the declared output names for this step" without ever stating what
+    those names actually were, so a real run guessed a plausible-sounding
+    key (`brief`) instead of the graph-declared one (`research_brief`) and
+    failed the next node's input resolution.
+    """
+    keys = ", ".join(f'"{n}"' for n in output_names)
+    return (
+        "\n\n## Required output keys (MANDATORY)\n"
+        f"Your JSON response must be a single object with exactly these "
+        f"top-level keys: {keys}. Do not substitute a synonym or a "
+        f"differently-cased/spelled key name for any of these."
+    )
+
+
 def _rlm_opt_in(node: Any) -> bool:
     """The a-rlm-recursive-node opt-in gate — a MINIMAL, dependency-free check on
     ``node.config.rlm`` so the flag-OFF path decides WITHOUT importing rlm.py
@@ -268,6 +292,7 @@ class AgentSpawn(Protocol):
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:  # pragma: no cover — Protocol
         ...
 
@@ -300,6 +325,7 @@ class StubAgentSpawn:
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
         self.calls.append(
             {
@@ -308,6 +334,7 @@ class StubAgentSpawn:
                 "inputs": dict(inputs),
                 "run_id": run_id,
                 "step_id": step_id,
+                "timeout_ms": timeout_ms,
             }
         )
         if step_id in self.canned_outputs:
@@ -343,9 +370,15 @@ class LocalAgentSpawn:
         *,
         timeout_ms: int = _DEFAULT_TIMEOUT_MS,
         claude_bin: str = "claude",
+        repo_root: Path | str | None = None,
     ) -> None:
         self._timeout_ms = timeout_ms
         self._claude_bin = claude_bin
+        # Threaded through so the nested `claude --print` subprocess runs
+        # with the correct cwd instead of silently inheriting whatever
+        # directory the calling process happens to be in (a4/a5 pilot runs:
+        # correct by accident when the caller `cd`s first, wrong otherwise).
+        self._repo_root = Path(repo_root).resolve() if repo_root is not None else None
 
     # ------------------------------------------------------------------
     # AgentSpawn Protocol
@@ -358,9 +391,10 @@ class LocalAgentSpawn:
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
         prompt = self.build_prompt(agent, step_file_content, inputs, run_id, step_id)
-        raw = self._invoke_claude(prompt, step_id)
+        raw = self._invoke_claude(prompt, step_id, timeout_ms=timeout_ms)
         return self._parse_json_output(raw, step_id)
 
     # ------------------------------------------------------------------
@@ -401,8 +435,17 @@ class LocalAgentSpawn:
     # Subprocess dispatch
     # ------------------------------------------------------------------
 
-    def _invoke_claude(self, prompt: str, step_id: str) -> str:
-        timeout_s = self._timeout_ms / 1000.0
+    def _invoke_claude(
+        self, prompt: str, step_id: str, *, timeout_ms: int | None = None
+    ) -> str:
+        # A node's own declared timeout_ms (threaded from AgentHandler)
+        # overrides the instance default — without this every step was
+        # capped at the constructor default (300s) regardless of what the
+        # workflow graph declared, so a step legitimately budgeted for 600s
+        # (e.g. test-spec, implement) timed out well before the agent could
+        # finish.
+        effective_timeout_ms = timeout_ms if timeout_ms else self._timeout_ms
+        timeout_s = effective_timeout_ms / 1000.0
         try:
             result = subprocess.run(
                 [self._claude_bin, "--print"],
@@ -413,7 +456,7 @@ class LocalAgentSpawn:
             )
         except subprocess.TimeoutExpired as exc:
             raise AgentHandlerError(
-                f"local agent-spawn timed out after {self._timeout_ms} ms "
+                f"local agent-spawn timed out after {effective_timeout_ms} ms "
                 f"for step {step_id!r}"
             ) from exc
         if result.returncode != 0:
@@ -441,11 +484,21 @@ class LocalAgentSpawn:
             text = "\n".join(lines[1:end]).strip()
         try:
             result = json.loads(text)
-        except ValueError as exc:
-            raise AgentHandlerError(
-                f"local agent-spawn for step {step_id!r} returned non-JSON: "
-                f"{text[:200]!r}"
-            ) from exc
+        except ValueError:
+            # A real `claude --print` response can embed literal control
+            # characters (e.g. raw newlines) inside a large JSON string
+            # value instead of the escaped `\n` form — strict=True (the
+            # json module default) rejects that outright. strict=False
+            # accepts literal control characters inside strings, which
+            # recovers this exact, observed failure mode without weakening
+            # anything else about the parse.
+            try:
+                result = json.loads(text, strict=False)
+            except ValueError as exc:
+                raise AgentHandlerError(
+                    f"local agent-spawn for step {step_id!r} returned non-JSON "
+                    f"(even with strict=False): {text[:200]!r}"
+                ) from exc
         if not isinstance(result, dict):
             raise AgentHandlerError(
                 f"local agent-spawn for step {step_id!r} returned "
@@ -507,7 +560,12 @@ class MulticaAgentSpawn:
         inputs: dict[str, Any],
         run_id: str,
         step_id: str,
+        timeout_ms: int | None = None,
     ) -> dict[str, Any]:
+        # Not consumed here: Multica's timeout is the issue-poll loop
+        # (_DEFAULT_TIMEOUT_MS / _FAST_CMD_TIMEOUT_S below), a fundamentally
+        # different shape from a single subprocess call's timeout. Accepted
+        # only for Protocol parity with LocalAgentSpawn/StubAgentSpawn.
         tracker_id = self._resolve_tracker_id(
             run_id, step_id, agent, step_file_content, inputs
         )
@@ -1484,6 +1542,16 @@ class AgentHandler:
         step_file_content = ""
         if node.step_file:
             step_file_content = self._read_step_file(node.step_file)
+        elif getattr(node, "task", None):
+            # A node without a step_file (e.g. write-brief in
+            # development.tdd.workflow.yaml) previously got NO task
+            # description at all — node.task was parsed off the workflow
+            # YAML but never actually transmitted to the spawned agent by
+            # any binding. Observed failure: write-brief received only the
+            # raw inputs JSON and a generic "respond with the declared
+            # output keys" instruction with no indication of what the task
+            # even was, and the graph's own declared task text sat unused.
+            step_file_content = node.task.strip()
 
         # Match-resolve-load-invoke seam (see hive/lib/skill_binding.py). A node
         # opting in via ``config.skill_binding`` gets its bound skill actually
@@ -1580,6 +1648,14 @@ class AgentHandler:
         # step content itself is still passed VERBATIM after the contract; local
         # and test spawns consume canned outputs and get no contract.
         effective_step_file = step_file_content
+        if semantic_outputs:
+            # Binding-agnostic: every node that declares outputs gets the
+            # exact key names spelled out, regardless of which spawn
+            # binding handles it. See _required_output_keys_footer's
+            # docstring for the failure this closes.
+            effective_step_file = effective_step_file + _required_output_keys_footer(
+                semantic_outputs
+            )
         if is_multica and semantic_outputs:
             # Bracket the brief: the prepended preamble is read FIRST and then
             # forgotten by turn-end after a long task (observed: the tester ran
@@ -1589,7 +1665,7 @@ class AgentHandler:
             # the moment the write is actually due.
             effective_step_file = (
                 _output_contract_preamble(semantic_outputs)
-                + step_file_content
+                + effective_step_file
                 + _output_contract_closer(semantic_outputs)
             )
 
@@ -1644,6 +1720,7 @@ class AgentHandler:
                     inputs=dict(inputs),
                     run_id=run_id,
                     step_id=node.id,
+                    timeout_ms=getattr(node, "timeout_ms", None),
                 )
             except AgentHandlerError:
                 raise

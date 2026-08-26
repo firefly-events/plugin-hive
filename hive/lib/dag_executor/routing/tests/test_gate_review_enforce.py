@@ -42,7 +42,7 @@ class _Canned:
         self.canned = canned
         self.calls: list[str] = []
 
-    def __call__(self, agent, step_file_content, inputs, run_id, step_id):
+    def __call__(self, agent, step_file_content, inputs, run_id, step_id, timeout_ms=None):
         self.calls.append(step_id)
         return dict(self.canned.get(step_id, {}))
 

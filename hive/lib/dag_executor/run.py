@@ -184,7 +184,7 @@ def resolve_spawn_binding(
     if name in ("local", "", "default"):
         from hive.lib.dag_executor.executor import LocalAgentSpawn
 
-        return "local", LocalAgentSpawn()
+        return "local", LocalAgentSpawn(repo_root=repo_root)
 
     if name in _BINDING_FACTORIES:
         return name, _BINDING_FACTORIES[name](repo_root=repo_root)
