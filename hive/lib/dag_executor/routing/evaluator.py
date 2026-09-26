@@ -101,6 +101,28 @@ def _is_finite_number(value: Any) -> bool:
     return False
 
 
+def _eval_operand_fail_closed(node: Any, output_graph: dict[str, Any]) -> bool:
+    """Evaluate one And/Or operand, converting a PredicateEvalError raised
+    ANYWHERE inside it to False for that operand only.
+
+    pr20-fable-review T1: without this, `evaluate()`'s top-level try/except
+    is the ONLY place a PredicateEvalError is caught — so an error raised
+    while evaluating one operand of an `Or` (e.g. a missing/empty mid-chain
+    round in the rec-1 last-successful-round OR-chain,
+    `$r1.output.x == true || $r2.output.x == true || $r3.output.x == true`,
+    where round 2 optional-failed with `outputs={}`) aborts evaluation of
+    the ENTIRE expression before later `Or` terms (round 3's genuinely
+    converged signal) are ever reached, poisoning the whole gate to False.
+    Fail-closed-to-False is the correct direction for a single missing
+    field, but it must be scoped to the operand that actually failed, not
+    propagate past sibling `||` branches that may still resolve True.
+    """
+    try:
+        return _eval_node(node, output_graph)
+    except PredicateEvalError:
+        return False
+
+
 def _eval_node(node: Any, output_graph: dict[str, Any]) -> bool:
     """Evaluate a boolean-valued AST node.
 
@@ -108,15 +130,15 @@ def _eval_node(node: Any, output_graph: dict[str, Any]) -> bool:
     """
 
     if isinstance(node, And):
-        left_val = _eval_node(node.left, output_graph)
+        left_val = _eval_operand_fail_closed(node.left, output_graph)
         if not left_val:
             return False
-        return _eval_node(node.right, output_graph)
+        return _eval_operand_fail_closed(node.right, output_graph)
     if isinstance(node, Or):
-        left_val = _eval_node(node.left, output_graph)
+        left_val = _eval_operand_fail_closed(node.left, output_graph)
         if left_val:
             return True
-        return _eval_node(node.right, output_graph)
+        return _eval_operand_fail_closed(node.right, output_graph)
 
     if isinstance(node, (Equals, NotEquals)):
         left = _resolve_operand(node.left, output_graph)

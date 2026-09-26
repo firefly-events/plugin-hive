@@ -26,11 +26,24 @@ EVENT_METRIC_TYPES = {
     "fix_loop_iterations": ("number", "iterations"),
     "first_attempt_pass": ("bool", "bool"),
     "human_escalation": ("bool", "bool"),
+    # human_gate_ms (story s1-gate-timing-metric): elapsed ms between a
+    # user_gate suspend and its approve/reject sentinel resolving.
+    "human_gate_ms": ("number", "ms"),
     # scope_drift_score (story ed-3-drift-metric-emit): bucketed v1.
     # value is the ordinal 0..3 — 0=none, 1=minor, 2=major, 3=divergent.
     # The bucket label travels in dimensions.bucket so it can be filtered
     # without re-deriving from the ordinal. See hive/lib/scope_drift.py.
     "scope_drift_score": ("number", "bucket"),
+    # transcript_skipped (story hqp-6-stop-hook-bound): emitted by
+    # hooks/metrics-stop-dispatch.sh's size guard when a transcript exceeds
+    # metrics.stop_dispatch_max_transcript_bytes and the token-extraction
+    # parse is skipped. value is the transcript's byte size.
+    "transcript_skipped": ("number", "bytes"),
+    # plan_drift_delta_count (story wr-6-plan-drift-instrument): value is
+    # the raw count of {planned, actual, stories_touched} deltas recorded
+    # in an epic's reconciliation artifact. See hive/lib/plan_drift.py.
+    "plan_drift_delta_count": ("number", "deltas"),
+    "agent_spawn": ("number", "count"),
 }
 
 CREATE_REQUIRED_ENVELOPE_FIELDS = {

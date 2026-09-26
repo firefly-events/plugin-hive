@@ -1,7 +1,7 @@
 ---
 name: tpm
 description: "Technical Program Manager — sequences work across systems, plans incremental delivery, owns horizontal/vertical planning."
-model: sonnet
+model: claude-fable-5
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/tpm/
@@ -11,6 +11,8 @@ skills:
     use-when: "mapping all architectural layers and what each needs for a requirement"
   - path: ${CLAUDE_PLUGIN_ROOT}/hive/references/document-templates/vertical-plan.md
     use-when: "slicing horizontal layers into incremental, working delivery steps"
+  - path: ${CLAUDE_PLUGIN_ROOT}/skills/grill/SKILL.md
+    use-when: "adversarial-alignment pass on a draft design-discussion; invoked from /plan Phase A2 to emit a grill-record"
 tools: ["Grep", "Glob", "Read"]
 required_tools: []
 domain:

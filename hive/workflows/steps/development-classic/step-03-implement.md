@@ -68,6 +68,8 @@ e. Record the file(s) changed
 ```
 If this fails, stop and fix before continuing.
 
+**Maintain working notes during execution.** For a multi-phase story, keep a running scratchpad at `.pHive/task-notes/{story-id}/` — record decisions taken, partial progress, open questions, and intermediate findings so you stay coherent across phases. Read your own notes back when resuming. These notes are ephemeral working memory: WRITE-during-execution, DISCARD-at-story-close. They are NOT memory — they never enter insight staging or memory promotion (see `references/agent-memory-schema.md` → Ephemeral Working Memory).
+
 ### 4. Address cross-cutting concerns
 For each concern in the story's `cross_cutting` section:
 - Implement the specified action

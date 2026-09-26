@@ -14,7 +14,17 @@ Atomic skill, NOT inline `/review` prose. It resolves the pre-execution dispatch
 
 Call this skill once at the single `/review` dispatch point where the caller has both the story execution context and the current workflow handoff context.
 
-**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, `HIVE_REVIEW_MODE`, and `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+**Inputs:** `env` with `HIVE_SESSIONS_ENABLED`, `HIVE_PARALLEL_TEAMS`, `HIVE_TERMINAL_MUX`, and `HIVE_REVIEW_MODE`; parsed root `hive.config.yaml` containing `sessions.enabled`, `parallel_teams` or `execution.parallel_teams`, and `execution.terminal_mux`; parsed consumer `.pHive/hive.config.yaml` or `None`; parsed graduation registry workflow list or `None`; `workflow_name`; `epic_id` when known; `arguments` containing the `--sequential` flag state and dependency-depth summary; optional `review_dispatch_context` with `kind: initial | follow_up | rerun | resume`, `prior_reviewer_model`, and `prior_reviewer_source`; and `unblocked_stories[]` — the depth-0 ready stories at this dispatch tick, each carrying at minimum `id`, `parallel_allowed`, `parallel_rationale`, and (for `parallel_rationale: bounded-slice`) `files_to_modify[]` whose entries name the declared touch-set. Empty or single-element `unblocked_stories[]` is valid: the parallel-dispatch gate (Step 1.5) skips when there is no peer set to gate.
+
+**Reviewer continuity producer:** when no prior CC-workflows review marker exists,
+set `review_dispatch_context={kind: initial, prior_reviewer_model: null, prior_reviewer_source: null}`. For a
+follow-up, rerun, or resume, read the last successful
+`cc-workflows-run.yaml` marker for the same review unit and copy
+`field_sources.agent_models.Review.tier` into `prior_reviewer_model` and
+`field_sources.agent_models.Review.source` into `prior_reviewer_source`. Missing or
+invalid prior model attribution on a non-initial dispatch is a fail-loud routing error; never substitute
+the parent session model. Forward this resolved context unchanged to
+`review-mode-cc-workflows`.
 
 **Flag pass-through:** `--sequential` must be forwarded verbatim to the resolved mode atom (`review-mode-multica` or `review-mode-cc-workflows`). This dispatch skill does NOT consume or strip that flag — it captures it from `arguments` and passes it along unchanged so the receiving atom can apply the same gate-check and pipeline-skipping logic as the inline path.
 
@@ -31,11 +41,10 @@ Call this skill once at the single `/review` dispatch point where the caller has
 The mode selection uses these exact match conditions, in precedence order:
 
 1. **Sessions check:** match when `env.HIVE_SESSIONS_ENABLED` is exactly truthy by string normalization (`1`, `true`, or `"true"`) OR root `hive.config.yaml` has `sessions.enabled: true`. This wins over every team or sequential input.
-2. **Teams availability check:** match only when `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is exactly truthy by string normalization (`1`, `true`, or `"true"`).
-3. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams: true` or `execution.parallel_teams: true`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
-4. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
+2. **Parallel teams config check:** evaluate the resolved `parallel_teams` boolean from Step 0 below. The legacy reads (root `hive.config.yaml` `parallel_teams` or `execution.parallel_teams`) become the config-source path inside Step 0; this step matches whenever the resolved boolean is `true`.
+3. **Concurrency and flag check:** match only when the dependency-depth summary shows more than one story at the same depth AND `arguments` does not contain `--sequential`.
 
-The cmux variant is not a separate team gate. After all four team checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
+The cmux variant is not a separate team gate. After the parallel config and concurrency checks match, return `team-cmux` when the resolved `terminal_mux` from Step 0 equals `cmux`; otherwise return `team`.
 
 ## Sane Defaults
 
@@ -153,12 +162,11 @@ When the first branch above selects `mode_decision ∈ {cc-workflows, multica}`,
 Evaluate in this order and stop at the first selected path:
 
 1. If the sessions check matches, return `mode_decision=sessions` and `mode_reason=sessions-enabled`.
-2. If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is not truthy, return `mode_decision=sequential` and `mode_reason=agent-teams-env-disabled`.
-3. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
-4. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
-5. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
-6. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
-7. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
+2. If parallel teams config is not true, return `mode_decision=sequential` and `mode_reason=parallel-teams-disabled`.
+3. If the dependency-depth summary does not show multiple stories at the same depth, return `mode_decision=sequential` and `mode_reason=no-peer-depth`.
+4. If `--sequential` is present in `arguments`, return `mode_decision=sequential` and `mode_reason=sequential-flag`.
+5. When the resolved `terminal_mux` field (from Step 0, env > config > default) equals `cmux`, return `mode_decision=team-cmux` and `mode_reason=team-checks-pass-cmux`.
+6. Otherwise return `mode_decision=team` and `mode_reason=team-checks-pass`.
 
 This preserves precedence: `sessions > team-cmux > team > sequential`.
 
@@ -220,6 +228,6 @@ Any downstream `review-mode-*` atom that handles the `/review` workflow **MUST**
 
 This skill is the single dispatch point for `/review` mode selection, the parallel-dispatch gate (Step 1.5, `ed-7`), and the executor-vs-orchestrator runner cutover for review workflows. Callers must consume `mode_decision`, `mode_reason`, `gate_violations[]`, `runner_path`, and `runner_reason` from this skill instead of re-implementing any of those decisions in another skill or workflow step.
 
-When `mode_decision` resolves to `multica`, route to `skills/hive/skills/review-mode-multica/SKILL.md`. When `mode_decision` resolves to `cc-workflows`, route to `skills/hive/skills/review-mode-cc-workflows/SKILL.md`. Both atoms ship in later slices — references by skill-path here serve as forward declarations; their absence does not break this dispatch skill.
+When `mode_decision` resolves to `multica`, route to `skills/hive/skills/review-mode-multica/SKILL.md`. When `mode_decision` resolves to `cc-workflows`, route to `skills/hive/skills/review-mode-cc-workflows/SKILL.md` and pass the resolved `review_dispatch_context` as `dispatch_kind` plus `prior_reviewer_model`. Both atoms ship in later slices — references by skill-path here serve as forward declarations; their absence does not break this dispatch skill.
 
 The parallel-dispatch gate is reachable from no other surface: any future skill that wants to fan review stories out concurrently MUST do so through this dispatch point so the gate inspects its `unblocked_stories[]` set, and MUST add a row to [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the new dispatch shape.

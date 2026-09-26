@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hive:process-manifest:v1",
+  "title": "Hive Process Manifest",
+  "description": "Runtime-neutral declaration of a Hive workflow — its steps, gates, inputs/outputs, and the adapters that execute it on each substrate. The schema is intentionally executor-agnostic: nothing here requires Claude Code, CC sessions, or CC hooks.",
+  "type": "object",
+  "required": ["id", "name", "version", "steps", "adapters"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Stable kebab-case workflow identifier. Must match the filename stem (<id>.process.yaml)."
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable workflow name."
+    },
+    "description": {
+      "type": "string",
+      "description": "One-paragraph description of what the workflow accomplishes."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$",
+      "description": "Semver of this manifest's structure (not the codebase version)."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Ordered list of logical steps. Topological order is not required; edges are declared via depends_on.",
+      "items": { "$ref": "#/$defs/step" }
+    },
+    "adapters": {
+      "type": "object",
+      "description": "Substrate → adapter map. Keys are substrate identifiers (default, multica, cc-workflows, hive-dag, …). The 'default' key is required and is the fallback when the running substrate is not found.",
+      "required": ["default"],
+      "additionalProperties": { "$ref": "#/$defs/adapter" }
+    }
+  },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "required": ["id", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Unique step identifier within this workflow."
+        },
+        "role": {
+          "type": "string",
+          "description": "Agent persona that executes this step (e.g. researcher, architect, technical-writer, reconcile-handler)."
+        },
+        "label": {
+          "type": "string",
+          "description": "Short human-readable step name."
+        },
+        "description": {
+          "type": "string",
+          "description": "What this step does."
+        },
+        "node_type": {
+          "type": "string",
+          "enum": ["agent", "user_gate", "gate", "reconcile"],
+          "default": "agent",
+          "description": "Execution semantics. agent = active work; user_gate = suspend until human/predicate approval; gate = assertion that halts on failure; reconcile = merge/materialise committed state."
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "default": [],
+          "description": "Step IDs that must complete before this step may start."
+        },
+        "inputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/input_binding" },
+          "default": [],
+          "description": "Named inputs resolved at dispatch time."
+        },
+        "outputs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/output_decl" },
+          "default": [],
+          "description": "Named outputs this step produces."
+        },
+        "auto_pass_when": {
+          "type": "string",
+          "description": "Strict-Archon predicate. Applies only to user_gate nodes: when this expression evaluates to true the gate auto-passes without human review."
+        },
+        "gate": {
+          "type": "string",
+          "description": "Assertion string for gate nodes. The executor evaluates this; failure halts the workflow."
+        },
+        "retry": {
+          "$ref": "#/$defs/retry_policy"
+        },
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Per-step wall-clock timeout in milliseconds."
+        }
+      }
+    },
+    "input_binding": {
+      "type": "object",
+      "required": ["name", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "source": {
+          "type": "string",
+          "enum": ["context", "step_output"],
+          "description": "Where the value comes from: workflow context (requirement, config) or a prior step's output."
+        },
+        "context_key": {
+          "type": "string",
+          "description": "Key in the workflow execution context. Required when source=context."
+        },
+        "step_id": {
+          "type": "string",
+          "description": "Source step ID. Required when source=step_output."
+        },
+        "output_name": {
+          "type": "string",
+          "description": "Output name on the source step. Required when source=step_output."
+        },
+        "optional": {
+          "type": "boolean",
+          "default": false,
+          "description": "When true, a missing value yields null instead of an error."
+        }
+      }
+    },
+    "output_decl": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "type": {
+          "type": "string",
+          "enum": ["string", "json"],
+          "default": "string"
+        },
+        "description": { "type": "string" }
+      }
+    },
+    "retry_policy": {
+      "type": "object",
+      "required": ["max_attempts"],
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "on": {
+          "type": "string",
+          "enum": ["agent_failed"],
+          "default": "agent_failed",
+          "description": "Condition that triggers a retry. Only 'agent_failed' (transient execution error) is supported; under-runs are not retried."
+        }
+      }
+    },
+    "adapter": {
+      "type": "object",
+      "required": ["type"],
+      "description": "How a specific substrate executes this workflow.",
+      "oneOf": [
+        { "$ref": "#/$defs/adapter_cc_skill" },
+        { "$ref": "#/$defs/adapter_dag_workflow" },
+        { "$ref": "#/$defs/adapter_inline" }
+      ]
+    },
+    "adapter_cc_skill": {
+      "type": "object",
+      "required": ["type", "skill"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "cc-skill" },
+        "skill": {
+          "type": "string",
+          "pattern": ".*\\.md$",
+          "description": "Repo-relative path to the CC SKILL.md file that implements this workflow for this substrate."
+        }
+      }
+    },
+    "adapter_dag_workflow": {
+      "type": "object",
+      "required": ["type", "workflow"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "dag-workflow" },
+        "workflow": {
+          "type": "string",
+          "pattern": ".*\\.yaml$",
+          "description": "Repo-relative path to the hive-dag workflow YAML file."
+        }
+      }
+    },
+    "adapter_inline": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "inline" },
+        "description": {
+          "type": "string",
+          "description": "Explanation of why this substrate runs inline (no separate file)."
+        }
+      }
+    }
+  }
+}

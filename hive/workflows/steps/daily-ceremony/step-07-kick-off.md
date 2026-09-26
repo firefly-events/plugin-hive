@@ -41,15 +41,14 @@ Analyze the approved stories for independence:
 - **Dependent stories:** must execute in dependency order
 
 Decision matrix:
-- If 2+ independent stories AND `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`: use TeamCreate for parallel execution
+- If 2+ independent stories and `execution.parallel_teams` is not `false`: use parallel execution
 - If all stories are dependent (chain): execute sequentially using the Agent tool
 - If mixed: group independent stories into a parallel batch, chain dependent stories sequentially
 
 ### 2. Set up parallel execution (if applicable)
 For parallel teams:
-- Use `TeamCreate` to create a team for the session
+- Describe the team in natural language; the runtime materializes teammates automatically
 - Create tasks for each independent story using `TaskCreate`
-- Spawn teammates using the Agent tool with `team_name` and `name` parameters
 - Each teammate receives: story spec, cycle state, relevant agent memories, development workflow
 
 ### 3. Execute each story through its development workflow

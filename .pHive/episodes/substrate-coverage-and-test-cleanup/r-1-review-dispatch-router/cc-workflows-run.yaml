@@ -1,9 +1,0 @@
-step: cc-workflows-run
-story: r-1-review-dispatch-router
-epic: substrate-coverage-and-test-cleanup
-status: passed
-workflow_run_id: wf_df1beba3-81d
-review_verdict: passed
-test_summary: 89/89 vitest cases (6 test files)
-insight_capture: {memories_written: 2, personas: [developer, tester]}
-usage: {agent_count: 4, subagent_tokens: 230226, tool_uses: 57, duration_ms: 484623}

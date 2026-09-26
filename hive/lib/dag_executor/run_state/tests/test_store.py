@@ -38,15 +38,17 @@ def _fresh(slug: str = "code-review") -> tuple[str, str]:
     return rid, slug
 
 
-def test_create_initializes_with_schema_version_zero():
+def test_create_initializes_with_current_schema_version():
     rid, slug = _fresh()
     s = create(rid, slug)
     assert s.run_id == rid
     assert s.workflow_slug == slug
-    assert s.schema_version == SCHEMA_VERSION == 0
+    # b2 bumped the pinned schema to v1.
+    assert s.schema_version == SCHEMA_VERSION == 1
     assert s.status == RunStatus.RUNNING
     assert s.frozen is False
     assert s.node_statuses == {}
+    assert s.node_hashes == {}
 
 
 def test_set_node_status_returns_new_dataclass_input_unchanged():
@@ -92,7 +94,7 @@ def test_load_unsupported_schema_version_raises(runs_root: Path):
     save(s, root=runs_root)
     path = runs_root / rid / "run_state.yaml"
     text = path.read_text(encoding="utf-8")
-    path.write_text(text.replace("schema_version: 0", "schema_version: 99"))
+    path.write_text(text.replace("schema_version: 1", "schema_version: 99"))
     with pytest.raises(SchemaVersionMismatchError):
         load(rid, root=runs_root)
 

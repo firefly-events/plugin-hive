@@ -12,6 +12,8 @@ Consumed by design-discussion (post-reclassify path: `hive/references/document-t
 **Source draft:** {path to the design-discussion this grill was run against}
 **CONTEXT.md substrate:** {present | absent (reduced fidelity)}
 **inconsistency_risk_signals:** {present | absent (heuristic pass)}
+**round_number:** {1-based integer — the current round when invoked as part of a loops.grill multi-round pass; defaults to 1 for a single/standalone invocation}
+**unresolved_count:** {integer — total open findings across all five categories in THIS round's pass; 0 means this round's draft is converged}
 **Generated:** {ISO 8601 timestamp}
 
 ## Summary
@@ -84,6 +86,8 @@ Grill does NOT propose solutions, score quality, gate work, or prioritize findin
 - **Cite by line number.** Findings reference specific lines in the source draft. If the draft is in-memory (planner buffer), use section headers + a 1-line quote instead.
 - **Question for planner.** Every finding ends with an explicit question — grill's role is to surface and prompt, not to prescribe.
 - **Overwrite-on-rerun.** Re-running grill against the same epic overwrites the prior grill-record. Adversarial passes are point-in-time; only the latest is canonical.
+- **`round_number` is a label on the current pass, not cross-round history.** Because each round overwrites the prior record (above), `round_number` does NOT make earlier rounds' records individually retrievable after the fact — the file at any moment only ever shows the latest round's number and findings. Its purpose is narrower: it tells the *reader of the current record* which round produced it (so /plan's Phase A2 loop log and the grill-record agree on round identity while the loop is running), and it lets /plan pass round-relative context (e.g. "this is round 2 of up to 3") into the pass itself. If a caller needs the full history across rounds, it must capture each round's record externally (e.g. copy to `.../grill-record-r{k}.md`) before the next round's grill invocation overwrites it — grill itself does not retain that history.
+- **`unresolved_count` is per-round, not cumulative.** It reflects only the findings surfaced in the current pass against the current draft — not a running total across rounds.
 
 ## See also
 

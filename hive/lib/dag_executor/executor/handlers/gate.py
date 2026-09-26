@@ -1,9 +1,15 @@
-"""Gate handler — declarative presence/non-empty checks.
+"""Gate handler — declarative presence/non-empty checks + strict predicate grammar.
 
 Initial implementation handles the `must not be empty` predicate
 shipping today (e.g., `development.classic.workflow.yaml:166` —
 `test_artifacts must not be empty`). Richer predicate languages land
 in hde-3a; this handler intentionally stays narrow.
+
+s3-convergence-signal: also handles grammar-legal dotpath predicates of the
+form ``$<node>.output.<field> == true|false``. When the walker injects the
+full ``__output_graph`` view into the gate's inputs (same mechanism as
+user_gate), the handler evaluates these strict predicates directly against
+the materialised output graph — no prose parsing needed.
 
 The gate's predicate string lives on `node.gate`. Inputs to the gate
 are the resolved input values from the materialised output graph.
@@ -18,6 +24,10 @@ from typing import Any
 from ..errors import GateFailedError
 from .agent import NodeOutput
 
+# Key used to pass the materialised output-graph view into gate inputs.
+# Injected by the walker (same mechanism as user_gate's __output_graph).
+_GATE_OUTPUT_GRAPH_INPUT = "__output_graph"
+
 
 _NOT_EMPTY = re.compile(r"^(?P<name>[\w.-]+)\s+must\s+not\s+be\s+empty$", re.IGNORECASE)
 # C3: schema-validation predicate — "epic_dir must be valid plan-epic"
@@ -29,13 +39,52 @@ _MUST_BE_VALID = re.compile(
 _MUST_EQUAL = re.compile(
     r"^(?P<name>[\w.-]+)\s+must\s+equal\s+(?P<expected>[\w.-]+)$", re.IGNORECASE
 )
-# #16: negated form — "review_verdict must not equal needs_revision". Blocks only
-# the named bad value (a needs_revision review must not silently integrate) while
-# letting every other verdict (passed, needs_optimization) proceed.
+# Legacy negated form retained for non-review gates. Live review integration
+# gates use the explicit-passed form below rather than a partial exclusion.
 _MUST_NOT_EQUAL = re.compile(
     r"^(?P<name>[\w.-]+)\s+must\s+not\s+equal\s+(?P<expected>[\w.-]+)$",
     re.IGNORECASE,
 )
+
+_REVIEW_VERDICTS = {"passed", "needs_revision", "needs_optimization"}
+# s2-needs-optimization-passes-gate: the pass-set for convergence. Hive's own
+# reviewer contract treats needs_optimization as non-blocking (nits/suggestions,
+# not defects), so it must satisfy the gate exactly like an explicit passed
+# verdict. needs_revision is a genuine blocking verdict and stays excluded —
+# widening this set to include it would reintroduce the #26 hollow-green bug.
+_PASS_VERDICTS = {"passed", "needs_optimization"}
+_MISSING = object()
+
+
+def _validate_review_signal(node: Any, inputs: dict[str, Any]) -> None:
+    """Validate the review verdict/signal contract before evaluating a gate.
+
+    ``review_passed`` is intentionally a boolean convergence signal rather
+    than a second approval decision.  Only verdicts in ``_PASS_VERDICTS``
+    (``passed`` and ``needs_optimization``) may produce ``True``; every other
+    known verdict (``needs_revision``) must produce ``False``.  This check
+    also rejects missing, malformed, or inconsistent agent output before a
+    grammar predicate could accidentally accept it.
+    """
+
+    verdict = inputs.get("review_verdict", _MISSING)
+    signal = inputs.get("review_passed", _MISSING)
+    if not isinstance(verdict, str) or verdict not in _REVIEW_VERDICTS:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_verdict must be one of "
+            f"{sorted(_REVIEW_VERDICTS)!r}; got {verdict!r}"
+        )
+    if type(signal) is not bool:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_passed must be a boolean; "
+            f"got {signal!r}"
+        )
+    expected = verdict in _PASS_VERDICTS
+    if signal != expected:
+        raise GateFailedError(
+            f"gate node {node.id!r}: review_passed={signal!r} is inconsistent "
+            f"with review_verdict={verdict!r}"
+        )
 
 
 def _is_empty(value: Any) -> bool:
@@ -181,6 +230,38 @@ class GateHandler:
                 outputs={"gate_passed": True},
                 meta={"predicate": predicate, "target": target},
             )
+
+        # s3-convergence-signal: try strict predicate grammar (dotpath == bool/value).
+        # The walker injects ``__output_graph`` into gate inputs so we can evaluate
+        # grammar-legal predicates like ``$review__r3.output.review_passed == true``
+        # against the full materialised output. Fail-closed-to-block: if the output
+        # graph is absent, the predicate fails (gate blocks) rather than silently
+        # passing, preserving bug-#26 safety semantics.
+        output_graph = inputs.get(_GATE_OUTPUT_GRAPH_INPUT)
+        if output_graph is not None:
+            try:
+                from hive.lib.dag_executor.routing import evaluate as eval_predicate
+                from hive.lib.dag_executor.routing import parse as parse_predicate
+                from hive.lib.dag_executor.routing.errors import Skipped
+
+                if node.id == "gate-review" and "review_passed" in predicate:
+                    _validate_review_signal(node, inputs)
+                ast = parse_predicate(predicate)
+                if not isinstance(ast, Skipped):
+                    result = eval_predicate(ast, output_graph)
+                    if not result:
+                        raise GateFailedError(
+                            f"gate node {node.id!r}: predicate {predicate!r} evaluated False "
+                            f"(convergence signal not true — integrate blocked, bug-#26 preserved)"
+                        )
+                    return NodeOutput(
+                        outputs={"gate_passed": True},
+                        meta={"predicate": predicate, "grammar": "dotpath"},
+                    )
+            except GateFailedError:
+                raise
+            except Exception:
+                pass  # fall through to the final unknown-predicate error
 
         raise GateFailedError(
             f"gate node {node.id!r} predicate not understood by hde-2 gate handler "

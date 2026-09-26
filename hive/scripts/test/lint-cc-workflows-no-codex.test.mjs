@@ -99,7 +99,7 @@ function runLintWithFixtures(atoms) {
 // ---------------------------------------------------------------------------
 
 const HELPER_IMPORT =
-  "import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';";
+  "python3 hive/lib/cc_workflows_preconditions.py";
 
 /** A minimal clean atom that should pass all 4 checks. */
 const CLEAN_ATOM = `# Test Skill
@@ -297,7 +297,7 @@ describe('Check 4 (cc-workflows-preconditions-import)', () => {
     const { stderr } = runLintWithFixtures({
       noimport: ATOM_WITHOUT_IMPORT,
     });
-    expect(stderr).toContain('hive/lib/cc-workflows-preconditions.mjs');
+    expect(stderr).toContain('hive/lib/cc_workflows_preconditions.py');
   });
 });
 

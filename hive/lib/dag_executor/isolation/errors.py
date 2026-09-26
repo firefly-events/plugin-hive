@@ -26,11 +26,12 @@ class WorktreeLifecycleError(IsolationError):
 
 
 class WorktreeContaminationError(IsolationError):
-    """Target worktree path contains a symlink before `git worktree add`.
+    """Worktree creation failed a symlink-containment precondition.
 
     Security:plan-audit finding #8 mitigation — defends against an
     attacker-planted symlink under `.pHive/runs/{run_id}/` that could
-    redirect filesystem writes outside the worktree. The git worktree
-    itself does not jail filesystem writes; this check is a defensive
-    layer on top.
+    redirect filesystem writes outside the worktree, and against a tracked
+    symlink under `.claude/` that would escape the future worktree when copied
+    into it. The git worktree itself does not jail filesystem
+    writes; these checks are a defensive layer on top.
     """

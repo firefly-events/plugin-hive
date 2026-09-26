@@ -170,6 +170,61 @@ domain:
     delete: false
 ```
 
+## Native Permissions Mapping
+
+Hive's logical domain model and Claude Code's native permission fields are complementary layers.
+This section bridges them so a domain block can be translated into enforceable runtime config.
+
+### Property → native field mapping
+
+| Domain property | Value | Native field | Effect |
+|-----------------|-------|--------------|--------|
+| `read` | `true` | _(no restriction needed — Claude Code reads freely by default)_ | No change required |
+| `read` | `false` | `permissions.deny: ["Read(**)", "Bash(cat *)"]` | Block read tools for the matched paths |
+| `write` | `true` | `permissions.allow_paths: ["<glob>"]` | Allow Write/Edit inside the glob |
+| `write` | `false` | `permissions.allow_paths` omits the glob; `can_write: false` at agent scope | Deny all writes outside explicitly listed paths |
+| `delete` | `false` | `permissions.deny: ["Bash(rm *)", "Bash(git rm *)"]` | Block destructive shell operations |
+
+`delete: true` is intentionally absent from all Hive agent definitions — Hive treats deletion as always requiring explicit human approval.
+
+### Example: translating a domain block
+
+Agent frontmatter domain:
+
+```yaml
+domain:
+  - path: src/components/**
+    read: true
+    write: true
+    delete: false
+  - path: .
+    read: true
+    write: false
+    delete: false
+```
+
+Equivalent `.claude/settings.json` fragment:
+
+```json
+{
+  "permissions": {
+    "allow_paths": ["src/components/**"],
+    "deny": ["Bash(rm *)", "Bash(git rm *)"]
+  }
+}
+```
+
+`can_write: false` at the agent level enforces the catch-all `write: false` entry — the agent may only write inside paths listed in `allow_paths`.
+
+### Relationship to parameter-level permissions
+
+This mapping covers **path-scoped** access (which files an agent can touch).
+For **tool-parameter-level** restrictions — e.g. `Bash(npm run build*)` or `Read(src/api/*)` —
+see [`permission-patterns.md`](permission-patterns.md), which documents the `Tool(param:value)` syntax
+used in `permissions.allow` / `permissions.deny` arrays. The two layers compose:
+path-scoped `allow_paths` sets the write boundary; `Tool(param:value)` entries refine which
+specific operations are pre-approved or blocked within that boundary.
+
 ## Failure Modes
 
 - **Not checking domains** — team lead skips validation, violations go undetected. Mitigated by reviewer providing a second checkpoint.

@@ -9,7 +9,237 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-07-22
+
+### Version
+
+- **minor bump `2.15.1` → `2.16.0`.** Anchored by `mcp-rc-bridge-compat`. This release promotes the full `develop → main` diff merged since 2.15.1 went live (2026-07-20): `mcp-rc-bridge-compat` (#77), `agent-skill-adaptation` (#74), `multica-review-convergence` (#78), `multica-substrate-deepen` (#81), `cc-regression-hardening` (#80), and the Multica execute-reliability fixes (#71/#73/#75). All are documented here so the published changelog matches the full diff. Version sources (plugin.json, marketplace.json top-level + `plugins[0]`, README badge) in lockstep at `2.16.0`.
+
 ### Added
+
+- **Agent-assigned skill adaptation (6 stories, #74).** Wires Hive personas to **actually invoke** their bound skills through a shared resolve→load→invoke seam instead of trusting inert step-file prose. Ships the seam, packages four skills as authoritative invoked skills, proves cross-language invocation, and closes discovery with a prioritized backlog.
+- **Multica substrate-deepen (19 stories, #81).** Expands Multica integration from ~15% toward substrate-first coverage across the dispatch/execute surfaces.
+
+### Fixed
+
+- **MCP bridge compat: published-version negotiation + Claude Code min-version gate.** Both hand-rolled MCP servers now share a published-version allowlist, echo supported client versions, and fall back to `2025-11-25` for omitted or unsupported versions. The SessionStart gate (floor `2.1.217`) also fails loudly when the installed version is too old or cannot be verified. Full surface-by-surface verdicts live in `.pHive/epics/mcp-rc-bridge-compat/docs/compat-audit.md`.
+- **DAG-multica review loop converges without hand-adjudication (5 stories, #78).** Closes the review-loop churn that drove multi-story Multica `/execute` runs to the fix-cycle cap — review scope and per-round commit/verdict correlation now reach a converged verdict without manual branch adjudication.
+- **Multica execute reliability: fatal reconcile barriers + exact-commit harvest (#71/#73/#75).** Failed non-optional reconcile nodes now halt instead of degrading into downstream skips and hollow-green completion (#71); harvest no longer trusts reused daemon-local integration refs — it correlates HEAD and the local target against the executor snapshot, waits until the exact task commit is reachable from a stable origin integration ref, and preserves the exact per-task SHA when the shared branch advances again (#73/#75).
+- **Claude Code compatibility boundary hardened (`cc-regression-hardening`, #80).** Centralizes the supported Claude Code floor at `2.1.217` with a policy-driven hook gate, corrects recursive-permission guidance, adds fail-loud pre-graph worktree isolation checks (pinned-ref + symlink-escape defenses), preserves explicit reviewer model identity across follow-up/rerun/resume dispatches, and adds hermetic Python regression suites plus a compatibility matrix. Covers triage items t-010, t-012, t-013, t-016, t-017, t-018, t-021.
+- **Version drift reconciled.** `plugin.json`, `marketplace.json` (top-level + `plugins[0]`), and the README badge were three-way inconsistent (`2.15.1` / `2.16.0` split); all now read `2.16.0` in lockstep.
+
+### Compat notes
+
+- **BC2 (SDK sub-package split): n-a.** Repo-wide verdict — no surface imports the affected `@modelcontextprotocol/sdk` sub-packages.
+- **BC3 (SEP-2577 capability deprecations): unaffected.** All in-repo MCP surfaces advertise `capabilities: { tools: {} }` only; `sampling`/`roots`/`logging` are not used.
+
+## [2.15.1] - 2026-07-20
+
+### Version
+
+- **patch bump `2.15.0` → `2.15.1`.** This release promotes **all development merged to `develop` since 2.15.0 went live (2026-07-05)** — 7 epics in total. The two planned `minor` epics were reconciled to `patch` for a single consolidated patch release. Version sources (plugin.json, marketplace.json, README badge) in lockstep.
+- The 07-13 batch (`wfd-retro-hardening` #63, `metrics-observability` #64, `skill-footprint` #65, `cmux-modernization` #66) was planned and executed this ship cycle. Three more epics merged to `develop` earlier in the same post-2.15.0 window and ship now as part of the same promotion: `python-hardening` (#53), `sandcastle-stub-hygiene` (#61), `multica-learning-loop` (#45). All seven are documented below so the published changelog matches the full `develop → main` diff.
+
+### Added
+
+- **WFD-retro-hardening: process-visibility detectors + deterministic ship checks + plan-drift instrument (7 stories).** completion-record detector (SubagentStop/Stop), `/ship` no-squash merge-shape check, plan-derived `manual_verdict` aging + required-device-pass gate, narrowed check-agent-misuse Pattern-1, completion-marker contract wired into the operative team-prompt assembler, plan-drift instrument (depends_on_epic/planned_base_ref + merge-base reconciliation gate + metric), and lean-agent-prompt reference + override incident-field validation (moved to `hive/lib/insight_validation.py` on merge to avoid a filename collision with the learning-loop harvest module).
+- **Metrics-observability: expose the pipeline + per-skill token sensor (4 stories).** `/metrics` read-only command over the collect+render pipeline (mo-1); per-skill token sensor attributing token spend at the `Stop` hook boundary with a `/metrics` rollup view (mo-2, with the collect_tokens double-count fixed on merge); events gitignore taxonomy + collector foreign-row guard + `agent_spawn` validator (mo-3); learning-loop cold/warm dimension with a classic-path-only caveat (mo-4).
+
+- **Skill-footprint: safe conditional extractions + regression lint (4 stories).** Agent-skills best-practices grounding + corpus audit (sf-0); extracted the scope-conditional H/V + Structured-Outline plan phases to `skills/plan/references/` behind conditional reads (sf-1); CI `skill-size-lint` job with an 800-line cap + grandfather-ratchet allowlist (sf-2); read-only Phase-C compression-scope classification doc for a future epic (sf-3).
+- **Cmux-modernization: hook-correlation spike -> NO-GO (spike only).** cm-1 proved event-driven codex completion is infeasible in Hive's `interactive_panes` dispatch mode (notification id is panel-scoped, not the dispatch-time `CMUX_SURFACE_ID`; cmux drops codex's native `turn_id` before the event bus). cm-2 not built; poll/`report_shell_state` retained. Recorded as `outcome: stop-after-spike`.
+
+### Also shipped this release (merged to develop earlier in the same post-2.15.0 window)
+
+These epics merged to `develop` after 2.15.0 but before the 07-13 batch above. They ship in the same `develop → main` promotion; recording them here keeps the released changelog matched to the full diff.
+
+- **Python-hardening: tighten the canonical `hive/lib` runtime (9 stories, PR #53).** `config.py` fallback-path characterization tests (ph-1) + log-first `except` hardening with narrowed JSON probes (ph-2); documented + conformance-tested the 3-file config precedence (ph-3); KG-emit consolidation audit + parity fixture + plan, no code swap (ph-4); deduped the paths-block YAML scanner shared by `config.py` and `harness/snapshot.py` (ph-5); read-and-confirm analysis of the 9-file hand-rolled-YAML consolidation candidates (ph-6); `dag_executor` boundary analysis + written extraction plan, no code moves (ph-7); confirmed + deleted orphan Node files (ph-8); ported a 3-file Node tranche — `git_flow`, cc-workflows model-tier, cc-workflows preconditions — to Python (ph-9). Advances the Python-first charter without touching the named bridge surfaces.
+- **Sandcastle-stub-hygiene: repo hygiene (2 stories, PR #61).** Root-caused and fixed a `TMPDIR`→repo-root leak at the confirmed layer with a `.gitignore` backstop (hy-1); direct-execution repo tidy — worktree prune + proposals archive (hy-2). Sandcastle extraction itself remains deferred to an external-repo spinout.
+- **Multica agent learning loop: dispatched agents build on prior experience (3 stories, PR #45).** Read side — stamp the persona on dispatch and inject Prior Experience into the Multica story brief (s1); write side — curated harvest of self-capture into committed team-memories + KG at episode close (s2); verified the loop end-to-end on the studio daemon and settled the KG learning predicate (s3).
+
+## [2.15.0] - 2026-07-05
+
+**Event-driven execution, effort-adaptive runs, and a metric-capture harness — plus MCP-stateless readiness and a config-reference refresh.**
+
+### Added
+
+- **Event-driven execution loop** (epic `e5-execution-loop`, PR #29). Replaces
+  timer-polling of background-agent completion with a `SubagentStop` hook that writes
+  a `complete.json` marker; reconcile and the execution loop now consume the marker
+  instead of polling for terminal state, and Hive skips creating a duplicate PR when a
+  dispatched background agent already opened its own draft PR. Bash `run_in_background`
+  work has no completion hook in this runtime and is deliberately left on the poll path.
+- **Metric capture harness** (epic `metric-capture-harness`, PR #33). Instruments Hive
+  runs to reconstruct the build journey as visual aids — durable human-gate-time capture
+  from the DAG's `user_gate` handler, before/after run-boundary snapshots with a diff
+  helper, a collector that rolls metrics/episodes/snapshots into a single report, and a
+  self-contained HTML dashboard renderer with mermaid/SVG exports — first exercised
+  end-to-end on `/design-system`.
+- **`$CLAUDE_EFFORT`-aware execution + 1M-context personas** (epic
+  `context-effort-adaptation`, PR #31). A new session-start gate resolves the
+  `$CLAUDE_EFFORT` tier (low/medium/high/xhigh) so `low` effort skips the test-swarm and
+  `xhigh` escalates to forced security/performance audits; the orchestrator and
+  researcher personas also gained prompt-level guidance to exploit the 1M-context window
+  (read more before summarizing) within existing scope/time tiers.
+
+### Changed
+
+- **MCP stateless-behavior audit** (epic `mcp-stateless-behavior`, PR #28). Audited
+  Hive's MCP-touching surfaces ahead of the 2026-07-28 stateless-MCP cutover; corrected
+  session-affinity wording in `session-resilience.md` and added a stateless
+  session-taxonomy note, and audited the `multica-story-dispatch` Node bridge for
+  compliance with the no-session-handshake spec.
+- **Config reference refresh** (epic `config-reference-refresh`, PR #30). Doc-only
+  refresh of `hive/references/configuration.md` and related reference docs — QA'd the
+  `fallbackModel` section against current Claude Code behavior, added a `/config`
+  shortcut reference, an `anthropicAws` stub, and a `denyTools` cross-reference, and
+  documented `claude mcp login --no-browser` for headless MCP setup, keeping the file
+  scoped to Hive-owned `hive.config.yaml` surfaces.
+
+## [2.14.0] - 2026-07-03
+
+**DAG executor re-platform — contract-derived scheduling + static loop unroll.**
+Headline is the two-epic bundle promoted via PR #20 (`version_bump: minor` —
+drove this release); the release train also promotes several `version_bump: none`
+epics that accumulated on `develop` since 2.13.4 (see "Also in this release").
+
+### Added
+
+- **RLM/Open-Prose-informed DAG evolution** (epic `rlm-openprose-dag`, PR #20,
+  `version_bump: minor`). Layers four capabilities on Hive's deterministic DAG
+  spine while keeping it the audit/observability backbone:
+  - **Contract-derived DAG + reconcile-on-drift memoization** (`b`) — the graph
+    is derived from declared node contracts; unchanged upstream contracts skip
+    re-execution (drift-memoized scheduling).
+  - **Reference-based cross-node data passing** (`c`) — nodes pass data by
+    reference across the graph instead of inline copy.
+  - **Configurable hive-dag executor binding** (`p`) — all flows resolve their
+    spawn binding via `resolve_spawn_binding` (local / multica / sandcastle /
+    cc-workflows).
+  - **Bounded converge-loop primitive** (`t-005`/`t-006`) — the LOOP NodeType and
+    a converge-loop `review.workflow.yaml` (superseded at execution time by the
+    static unroll below, retained as an authoring keyword).
+  - **RLM-style recursive node** (`a`) — experimental, feature-flagged spike.
+- **Static loop unroll + configurable loop templates** (epic
+  `loop-unroll-templates`, PR #20, `version_bump: none`). Bounded LOOP nodes are
+  unrolled at **load time** into conditional DAG round-copies — the runtime LOOP
+  engine is retired; the executor walks a pure acyclic graph.
+  - **Load-time unroll expander** (`s2`) — `node_type: loop` → `<node>__r<k>`
+    round-copies + terminal gate; authoring keyword preserved, zero author-facing
+    change.
+  - **Boolean convergence-signal contract** (`s3`) — unrolled loops short-circuit
+    on a declared boolean (`review_passed`/`tests_green`/`behavior_satisfied`/
+    `coverage_satisfied`) via a converged-latch `skip_when` OR-chain.
+  - **Per-feature `loops:` config** (`s1`) — `loops.<feature>.{enabled,max_rounds}`
+    with `env > root > baseline` precedence and `HIVE_LOOPS_<FEATURE>_*` overrides.
+  - **First-class loop templates** — TDD red-green (`s5`), BDD converge (`s6`),
+    test-swarm rounds (`s7`), and a skill-level grill loop (`s8`). `review_converge`
+    / `tdd_red_green` / `bdd_converge` default **on**; `test_swarm` / `grill`
+    default **off** (opt-in — "turn grill on, set N rounds").
+  - **Load-time guards** — unbounded, nested, dep-less, and empty-body featured
+    loops, plus compound-gate/multi-exit early-convergence hazards, are rejected
+    at load (`GraphLoadError`) instead of surfacing as runtime surprises.
+
+### Changed
+
+- **Retire runtime LOOP machinery** (`s4`) — `NodeType.LOOP` runtime dispatch,
+  the in-place `sub_graph` iterator, and the loop handler are removed from the
+  executor. `node_type: loop` remains a parse-time authoring keyword only.
+- **Reconcile emits declared `reconcile_status`** — the real-sha merge path now
+  returns `reconcile_status: "merged"` (previously only the no-op path emitted it),
+  matching the 8 workflow bindings that consume it.
+- **Classic workflow empty-domain skip cascade** — `fix-cycle-review` gained the
+  `when: "$test.output.test_artifacts != null"` twin so review rounds skip
+  cleanly when there is no implementation to review.
+
+### Fixed
+
+- **27 pre-existing PR #20 test-suite failures** resolved (metric-signal routing,
+  meta-team-cycle drift, scan-roots frozen-clock, parity bar, reconcile status,
+  decomposition joins) — full suite green (**1522 passed / 0 failed / 3 skipped**).
+- **Version sources back in lockstep** — `marketplace.json` (2.13.3) and
+  `plugin.json` (2.13.4) reconciled to **2.14.0**.
+
+### Also in this release
+
+Co-shipped epics that landed on `develop` since 2.13.4 (all `version_bump: none`
+— reference/roster/skill surfaces, no core-engine semver impact):
+
+- **External model integration — roster re-pin** (PR #24). Re-pins the agent
+  roster to Sonnet 5 / Fable 5 across the dispatchable personas and wires the
+  `/plan` grill (Phase A2) model selection to match.
+- **Actual-manual test tier** (PR #17). Adds a manual-test execution mode
+  (`test-mode-actual`) and registers it in test dispatch — the SimMan spin-out
+  bridge seam for vision-cursor manual runs.
+- **Auto-spawn migration follow-on** (PR #16). Completes the TeamCreate/TeamDelete
+  retirement begun in 2.13.4's `meta-epic-1`: migrates remaining call sites to the
+  `Agent(name:)` auto-spawn mechanism (agent-teams guide, orchestrator/team-lead,
+  `hive.config.yaml`).
+- **LSP suggestion + kickoff discovery** (PR #14). Suggests an LSP on language
+  detection and adds kickoff discovery questions.
+- **Absorb 5 Claude Code capability shifts** (epic `meta-epic-2`, PR #11):
+  nested-subagent depth, fallback-model routing, cost-USD in `/standup`,
+  domain-native permissions, and marketplace tags folded into Hive's reference
+  surfaces.
+
+Not release-noted (internal only): idea-digest housekeeping (PRs #4/#8) touching
+`.pHive/meta-team` files.
+
+## [2.13.4] - 2026-06-26
+
+**Capability absorption + visual planning.** Two-epic bundle promoted to `main` via PR #9.
+
+### Added
+
+- **Visual Planning Enrichment** (epic `visual-plan-enrichment`, PLU-446..454, PR #5).
+  Python cutover of the Mermaid CDN to build-time inline SVG, titled + annotated
+  diagrams, a 0-KB visual shine layer, and configurable retention via sidecar
+  shine/serve. (`version_bump: patch` — drove this release.)
+
+### Changed
+
+- **Absorb validated Claude Code capability shifts into Hive** (epic `meta-epic-1`,
+  PR #7→develop). Folds five upstream Claude Code shifts into Hive's reference
+  surfaces (`version_bump: none`):
+  - **TeamCreate/TeamDelete removal migration** — migrated ~30 call sites across
+    hooks, skills, references, and tests from the removed `TeamCreate`/`TeamDelete`
+    tools to the `Agent(name:)` teammate mechanism, with flag-aware sequential
+    fallback (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`). Updated the
+    `check-agent-misuse.sh` hook and plan-wire tests; recorded a call-site inventory.
+  - **Ephemeral working-memory tier** — `.pHive/task-notes/{story-id}/`, written
+    during execution and discarded at story close (non-promotion invariant);
+    wired into classic/tdd/meta-team implement steps.
+  - **Parameter-level permission matching** — `Tool(param:value)` granular
+    permission patterns + role-to-deny-list guidance.
+  - **PostToolUse `updatedToolOutput` conventions** — new `hooks-conventions.md`
+    reference + Sandcastle-hooks disambiguation note.
+  - **Security + performance review dimensions** — opt-in `--security` /
+    `--performance` / `--all-dimensions` flags for `/review`, default-off,
+    regression-free baseline.
+
+## [2.13.3] - 2026-06-24
+
+### Added
+
+- **Headless question protocol** (epic `headless-question-protocol`, PR #341).
+  `/hive:kickoff`, `/hive:design`, and `/hive:plan` no longer block indefinitely
+  (or silently degrade to unparseable prose) when driven by a non-interactive
+  orchestrator like Minerva via `claude -p`. A new `HIVE_HEADLESS`/`CI=true`
+  detection primitive (`hive/lib/runtime_mode.{py,js}`) and a phase-batched
+  question-envelope gateway (`hive/lib/question_gateway.{py,js}`, schema at
+  `hive/references/question-envelope-schema.md`) let those three skills write a
+  structured, resumable question envelope to `.pHive/questions/` instead —
+  answer submission mirrors Minerva's own `submitAnswers` shape, and an
+  answer-deadline is renewable (OAuth-refresh style) rather than a fixed
+  one-shot timeout or a polling loop. Interactive behavior is unchanged; the
+  headless path only activates on explicit signal.
+- **Bounded global Stop hook** (same epic, PR #341). `metrics-stop-dispatch.sh`'s
+  token-extraction step previously slurped the entire session transcript into
+  memory (`jq -c -s`) with no size guard — benchmarked at ~13.6s / ~7.5GB peak
+  RSS on an 884MB synthetic transcript, close to the hook's 15s timeout.
+  Replaced with a streaming `jq | awk` pass (~9.5s / ~2.8MB peak memory on the
+  same fixture) plus a new `metrics.stop_dispatch_max_transcript_bytes` config
+  guard (default 300MB) that skips the parse above threshold rather than
+  relying solely on the harness-level timeout as a backstop.
 
 - **`/plan` DAG executor routing** (epic `plan-dag-cutover`, PR #327). Routes `/plan`
   through the deterministic DAG executor when configured, mirroring the `/execute`

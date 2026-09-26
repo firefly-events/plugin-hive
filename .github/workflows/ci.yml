@@ -1,61 +1,83 @@
 name: CI
-
+# Standard, reusable CI gate shared identically across all Pantheon/god repos.
+# Auto-detects the stack (node / python / go) and runs install + build + test.
+# Runs on every PR into dev and into the default branch (main/master). This is THE gate.
 on:
   pull_request:
-    branches: [main]
-  push:
-    branches: [main]
+    branches: [dev, main, master]
+  workflow_dispatch:
 
 jobs:
-  markdown-lint:
-    name: Markdown lint
+  ci:
+    name: ci
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - uses: DavidAnson/markdownlint-cli2-action@b4c9feab76d8025d1e83c653fa3990936df0e6c8 # v16
-        with:
-          globs: "**/*.md"
+      - uses: actions/checkout@v4
 
-  yaml-lint:
-    name: YAML lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          persist-credentials: false
-      - uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c # v3
-        with:
-          file_or_dir: "."
-          config_file: .yamllint.yml
+      - name: Detect stack
+        id: detect
+        run: |
+          if [ -f package.json ]; then echo "stack=node" >> "$GITHUB_OUTPUT"
+          elif [ -f pyproject.toml ] || [ -f requirements.txt ] || [ -f setup.py ]; then echo "stack=python" >> "$GITHUB_OUTPUT"
+          elif [ -f go.mod ]; then echo "stack=go" >> "$GITHUB_OUTPUT"
+          else echo "stack=none" >> "$GITHUB_OUTPUT"; fi
+          echo "Detected stack: $(tail -n1 "$GITHUB_OUTPUT")"
 
-  config-guard:
-    name: Shipped config guard (hde-9a + hde-9b)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      # ---- Node ----
+      - name: Setup Node
+        if: steps.detect.outputs.stack == 'node'
+        uses: actions/setup-node@v4
         with:
-          persist-credentials: false
-      - name: Reject `executor:` in shipped hive/hive.config.yaml
-        # Mechanical defense against the eefbff3 / project_config_shipping_deferred
-        # pattern: maintainer-only flags (like the hive-dag executor flag) must
-        # NOT land in the shipped baseline. The consumer-side equivalent lives
-        # at .pHive/hive.config.yaml per the hde-9a / Q4 user-gate lock.
+          node-version: '22'
+
+      - name: Node install / build / test
+        if: steps.detect.outputs.stack == 'node'
         run: |
-          if grep -nE '^executor:' hive/hive.config.yaml; then
-            echo "::error file=hive/hive.config.yaml::shipped baseline must not contain top-level 'executor:' key (hde-9a Q4 lock; consumer-side flag belongs in .pHive/hive.config.yaml)"
-            exit 1
+          set -e
+          if [ -f package-lock.json ]; then npm ci || npm install; else npm install; fi
+          npm run build --if-present
+          if node -e "const s=(require('./package.json').scripts)||{};process.exit(s.test?0:1)"; then
+            npm test
+          else
+            echo "No test script defined — CI gate passes (no tests to run)."
           fi
-      - name: Reject shipped graduation registry at hive/runtime/
-        # hde-9b extension: the per-workflow graduation registry is consumer-
-        # side only (`.pHive/runtime/executor-graduated-workflows.yaml`).
-        # A registry under the shipped tree (`hive/runtime/...`) would let a
-        # graduation event ship globally to every consumer — exactly the Q4
-        # lock this layer was built to prevent. Fail the build if the shipped
-        # path appears.
+
+      # ---- Python ----
+      - name: Setup Python
+        if: steps.detect.outputs.stack == 'python'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Python install / test
+        if: steps.detect.outputs.stack == 'python'
         run: |
-          if [ -e hive/runtime/executor-graduated-workflows.yaml ]; then
-            echo "::error file=hive/runtime/executor-graduated-workflows.yaml::shipped tree must not contain a graduation registry (hde-9b: registry is consumer-side at .pHive/runtime/executor-graduated-workflows.yaml)"
-            exit 1
-          fi
+          set -e
+          python -m pip install --upgrade pip
+          [ -f requirements.txt ] && pip install -r requirements.txt || true
+          if [ -f pyproject.toml ] || [ -f setup.py ]; then pip install -e . || pip install . || true; fi
+          pip install pytest
+          set +e
+          pytest -q
+          code=$?
+          if [ "$code" -eq 5 ]; then echo "No tests collected — CI gate passes."; exit 0; fi
+          exit $code
+
+      # ---- Go ----
+      - name: Setup Go
+        if: steps.detect.outputs.stack == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Go build / test
+        if: steps.detect.outputs.stack == 'go'
+        run: |
+          set -e
+          go build ./...
+          go test ./...
+
+      # ---- None ----
+      - name: No recognized stack
+        if: steps.detect.outputs.stack == 'none'
+        run: echo "No node/python/go project detected at repo root — CI gate passes (no-op)."

@@ -174,23 +174,17 @@ jobs:
       - name: Resolve base branch
         id: base
         env:
-          # Inline JS one-liner that imports the pe-1 helper (when
+          # Python helper invocation (when
           # vendored) and prints the resolved base_branch. Falls back to
           # the repo's default branch when the helper is absent so
           # non-Hive consumers see no behavior change.
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
-          BASE_BRANCH=$(node --input-type=module -e "
-            try {
-              const m = await import(process.cwd() + '/hive/lib/git_flow.mjs');
-              const out = m.resolveGitFlow({ cwd: process.cwd() });
-              process.stdout.write(out.base_branch || process.env.DEFAULT_BRANCH);
-            } catch {
-              process.stdout.write(process.env.DEFAULT_BRANCH);
-            }
-          ")
+          BASE_BRANCH=$(printf '%s' "{\"cwd\":\"$PWD\"}" | python3 hive/lib/git_flow.py | jq -r '.base_branch // env.DEFAULT_BRANCH')
           echo "base_branch=$BASE_BRANCH" >> "$GITHUB_OUTPUT"
+          BRANCH_STRATEGY=$(printf '%s' "{\"cwd\":\"$PWD\"}" | python3 hive/lib/git_flow.py | jq -r '.branch_strategy // "per-epic"')
+          echo "branch_strategy=$BRANCH_STRATEGY" >> "$GITHUB_OUTPUT"
 
       - name: Run Hive via sandcastle bridge
         env:
@@ -200,6 +194,7 @@ jobs:
           # Prevent the inner Hive from spawning more sandcastles. The
           # outer container is already the isolation boundary.
           HIVE_EXECUTION_MODE: team
+          HIVE_BRANCH_STRATEGY: ${{ steps.base.outputs.branch_strategy }}
         run: npx tsx .github/scripts/sandcastle-hive-bridge.mts
 
       - name: On success — open or update stacked PR + label

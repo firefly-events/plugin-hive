@@ -188,19 +188,35 @@ model_overrides:
   # Fable creates, Codex reviews)
 
 # Per-persona backend routing.
-# 2026-06-09 policy (supersedes 2026-05-01 codex-creates policy):
-#   Codex token budget nearly exhausted — use Codex SPARSELY, reviews only.
-#   Claude (Fable 5 / Sonnet 4.6) on all creator + sequencing roles.
-#   Cross-LLM verification direction flipped: Claude creates, Codex reviews.
-# Personas omitted from this map default to direct TeamCreate (Claude). The plan
+# 2026-06-28 policy (supersedes 2026-06-09 reviewer-on-codex):
+#   Claude on ALL creator + sequencing + PRIMARY-REVIEW roles. Codex is review-ONLY,
+#   used via a SINGLE adversarial pass (external_models.codex `codex-review` node) —
+#   NOT as the primary reviewer. Why: reviewer-on-codex made the primary `review` node
+#   a Codex call, so it (a) ran TWO Codex passes per story (review + codex-review) and
+#   (b) HARD-FAILED the whole run when Codex hit its usage limit. Primary review on
+#   Claude never blocks; Codex stays the read-only second opinion that auto-skips when
+#   credits/auth are unavailable. Codex NEVER fixes — optimize/dev-standby (fix nodes)
+#   run on `developer` (Claude). Verify Codex credit health before re-pinning it.
+# Personas omitted from this map default to direct `Agent(name:)` (Claude). The plan
 # skill emits one INFO-log line per persona at spawn time documenting the route.
 agent_backends:
-  reviewer: codex
-  # researcher/developer(s)/technical-writer/architect moved OFF codex
-  # 2026-06-09 (token budget); Multica agent pins updated to match:
-  # developer/architect/tester/peer-validator/tpm -> claude-fable-5,
-  # researcher/frontend-developer/backend-developer -> claude-sonnet-4-6,
-  # reviewer -> gpt-5.4 (codex runtime)
+  reviewer: codex              # reviewer-ONLY on Codex (gpt-5.4). Dev/fixes/research on Claude.
+  # 2026-06-30: reverted architect+researcher off Codex back to Claude after the
+  # rlm-openprose-dag planning run (execution wants Codex as reviewer-only).
+  # NOTE: with codex as primary reviewer AND external_models.codex below enabled, every
+  # story runs TWO Codex passes (primary review + adversarial codex-review) and the run
+  # hard-fails if Codex hits its usage limit (the failure that triggered the 2026-06-28
+  # switch to Claude). Verify Codex credit health before relying on this; disable the
+  # external_models.codex `codex-review` node if a single Codex pass is intended.
+  #
+  # ---- Runner-agnostic OpenAI-compat backends (openai-compat-backend.mjs, 2026-07-31) ----
+  # Spread REVIEW-tier personas off the throttled Claude account onto owned lanes: Kimi K3
+  # through OpenRouter, Gemini through Google's OpenAI-compat surface (our paid GEMINI_API_KEY).
+  # Read-only review roles only; Claude stays the primary creator/orchestrator + fallback.
+  # Token grammar:  gemini | gemini:<model> | openrouter:<model> | kimi (alias -> moonshotai/kimi-k3)
+  # Uncomment to enable (requires OPENROUTER_API_KEY / GEMINI_API_KEY exported):
+  #   security-reviewer: gemini       # gemini-3.1-pro-preview via paid GEMINI_API_KEY
+  #   performance-reviewer: kimi      # moonshotai/kimi-k3 via OpenRouter credit
 
 # Circuit breakers — prevent wasted time and tokens
 circuit_breakers:
@@ -235,13 +251,23 @@ example_codebases: []
 # Requires: npm install -g @openai/codex && codex login
 external_models:
   codex:
-    enabled: true               # codex-cli 0.118+ installed + ChatGPT auth active (verified 2026-05-07)
+    enabled: false              # 2026-06-30: disabled to avoid the DOUBLE Codex pass.
+                                # With agent_backends.reviewer:codex (PRIMARY review on Codex),
+                                # this adversarial codex-review node would be a 2nd Codex pass per
+                                # story → usage-limit hard-fail risk. Codex stays reviewer-only via
+                                # the primary review node. Re-enable (true) for a 2nd adversarial pass.
     use_for:
-      - adversarial-review      # run after Claude review, before optimize/integrate
+      - adversarial-review      # the ONLY Codex role: read-only 2nd-opinion review after
+                                # Claude's primary review, before optimize/integrate.
+    # Codex is REVIEW-ONLY here — it never fixes/implements (fixes run on `developer`=Claude).
+    # VERIFY-AND-SKIP contract: the `codex-review` node is optional + skip_when not
+    # installed/authenticated/enabled. A Codex usage-limit ("hit your usage limit … chatgpt.com")
+    # must be treated as a SKIP, never a run-fatal error — primary review already passed on Claude.
+    # Set enabled:false to disable the Codex pass entirely (e.g. while credits are exhausted).
     # companion_path is auto-detected from the codex plugin if installed
 
 # Git workflow settings (per-epic-branch-pr-flow epic, story pe-1)
-# Resolved by `hive/lib/git_flow.mjs` (`resolveGitFlow`). Uncomment to override
+# Resolved by `hive/lib/git_flow.py` (`resolve_git_flow`). Uncomment to override
 # the plugin defaults shipped at `hive/hive.config.yaml`.
 #
 # git_flow:
@@ -250,12 +276,18 @@ external_models:
 
 # Planning substrate routing (multica-plan-test-cycles epic).
 # Routes /plan Phase 0 persona dispatch through the Multica daemon instead of
-# direct TeamCreate. Per-persona fan-out (one Multica issue + agent UUID per
+# direct `Agent(name:)`. Per-persona fan-out (one Multica issue + agent UUID per
 # planning persona); Hive owns mode-resolve, polling, episode markers, and all
 # user review/sign-off gates (gates never advance from the Multica side).
 # Prereq: `/hive:multica-init` bootstrap. Env override: HIVE_PLANNING_MODE=multica.
 planning:
   mode: multica
+  # Sidecar retention policy for planning HTML sidecars.
+  # committed        — allowlist *.html (+ index.html) under the epic docs dir in .gitignore (default; best for group/shared projects).
+  # transient        — ignore *.html and regenerate on demand (best for solo projects where committed HTML is clutter).
+  # commit-docs-only — allowlist per-story doc sidecars but NOT index.html or PNGs.
+  # The per-epic /plan answer always overrides this config key; the config key overrides the shipped default (committed).
+  sidecar_retention: committed
   multica:
     poll_interval_seconds: 5
     persona_timeout_seconds: 1800   # 30-min wall clock per persona

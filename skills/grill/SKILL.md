@@ -12,6 +12,8 @@ description: Adversarial alignment — atomic skill called by /plan Phase A2 fro
 - A path to a draft design-discussion document (typically `.pHive/epics/{epic-id}/docs/design-discussion.md` or a buffer the planner is producing in-memory)
 - An epic ID — grill resolves the design-discussion path automatically and reads `inconsistency_risk_signals` from the planner's research-brief if present
 
+**`round_number` input (optional, integer, 1-based).** When `/plan` Phase A2 drives a `loops.grill` multi-round pass, it passes the current round as an explicit named argument alongside `$ARGUMENTS`, e.g. `round_number=2`. This is the interface referenced by Process step 1 below and by "Round tracking" under Output. When omitted (single/standalone invocation, or a caller outside the multi-round loop), grill defaults `round_number` to `1`.
+
 ## Skill Preamble
 
 See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md) — kickoff gate (initialization check) + persona / config / memory loading + project CONTEXT.md load (the substrate prelude step 4 added in story `a-26-context-md-skill-prelude-citation`).
@@ -24,9 +26,13 @@ A **grill-record** at `.pHive/epics/{epic-id}/docs/grill-record.md` (path may be
 
 The skill produces exactly one grill-record per invocation. Re-running grill against the same epic overwrites the prior record (adversarial passes are point-in-time — the latest is canonical).
 
+**Machine-readable convergence signal.** Each grill-record header includes an `unresolved_count` field (integer) — the total number of open findings across all five categories. A value of `0` means the draft is converged; /plan Phase A2 reads this field to determine whether to stop the multi-round loop early. Grill sets this field; /plan reads it.
+
+**Round tracking.** When invoked as part of a loops.grill multi-round pass, /plan passes the current `round_number` (1-based integer, see the Input section above) to grill. Grill records this in the grill-record header as `round_number` so the record identifies which round produced it. Because each invocation overwrites the prior grill-record (grill is stateless across invocations — see below), `round_number` labels the CURRENT pass only; it does not make prior rounds' records retrievable after the fact. A caller that needs the full round-by-round history must snapshot each round's record externally before the next round overwrites it. When invoked outside a multi-round loop (single pass / current round is not provided), `round_number` defaults to `1`.
+
 ## Process
 
-1. **Load the draft.** Read the design-discussion document (path resolved from `$ARGUMENTS`). If the document does not exist or is empty, error out — grill stress-tests an existing draft, it does not author one.
+1. **Load the draft.** Read the design-discussion document (path resolved from `$ARGUMENTS`). If the document does not exist or is empty, error out — grill stress-tests an existing draft, it does not author one. Resolve `round_number` from the `round_number` input (see Input section above); default to `1` when not provided.
 2. **Load `inconsistency_risk_signals`.** If the planner's research brief is reachable (e.g., `.pHive/epics/{epic-id}/docs/research-brief.md`), read its `inconsistency_risk_signals` field (added by the researcher persona — see story `a-28-grill-plan-a2-wiring`). Use these signals to focus the adversarial pass; if absent, grill runs heuristically against the draft alone.
 3. **Run the adversarial pass.** Five categories, each surfaced as a structured finding (or noted as "no findings" — silence is a valid result):
    - **Vocabulary mismatches** — terms used in the draft that contradict CONTEXT.md or shift meaning mid-document
@@ -66,7 +72,7 @@ This skill ends at step 2. Phase A2 owns step 3 onward (story `a-28-grill-plan-a
 ## Out of scope
 
 - Inline plan integration — grill is OUT of plan internals by design
-- Multi-pass refinement — one grill per invocation; re-run if needed
+- Automatic loop management — each grill invocation is a single atomic pass; loops.grill multi-round orchestration is owned by /plan Phase A2, not by grill. When /plan runs multiple rounds, it calls grill once per round and passes the current round_number; grill itself does not loop.
 - Cross-epic grilling — each invocation targets one design-discussion artifact
 - Auto-fixing findings — grill surfaces, planner resolves
 - External adversarial sources (GPT-as-grill, etc.) — out of scope; this is a Hive-internal pass

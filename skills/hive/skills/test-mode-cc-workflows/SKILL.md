@@ -21,7 +21,7 @@ HIVE_STATE_DIR = hive_config.paths.state_dir || ".pHive"
 
 All episode markers, messages sidecars, transcript references, and run summaries are rooted under that resolved state dir unless the Workflow tool returns an absolute transcript path.
 
-Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `test-dispatch`; do not silently fall through to direct `TeamCreate`, Codex, or Multica test paths. Fallback to those paths is the caller's responsibility and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
+Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `test-dispatch`; do not silently fall through to direct natural-language spawn, Codex, or Multica test paths. Fallback to those paths is the caller's responsibility and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
 
 Delegation rules: the orchestrator coordinates Workflow script assembly, Workflow invocation, polling, episode marker writes, and summary return; it does not run scenarios itself. Workflow agents execute the assigned scenario steps and return structured verdict payloads. Scenario behavior is loaded from the canonical `loadScenario(scenario_path)` result; do not improvise inline scenarios. **All workflow agents run on the default workflow subagent (no Codex `agentType`)** — cc-workflows mode is intentionally an inline-Claude substrate so the returned `<result>` IS the verdict payload. Codex routing belongs to other test paths; cc-workflows mode is an inline-Claude substrate and intentionally does not overlap.
 
@@ -40,7 +40,7 @@ The resolver lives in `test-dispatch` Step 0 and mirrors the execute-dispatch re
 - Any other value falls through to the existing test path (multica, local simulated-manual).
 - Env wins over config.
 
-On selection, `/test` resolves the story and scenario exactly as it already does, then routes here instead of spawning direct `TeamCreate`, Multica, or local-executor test runs.
+On selection, `/test` resolves the story and scenario exactly as it already does, then routes here instead of spawning direct natural-language spawn, Multica, or local-executor test runs.
 
 **Inputs:**
 - `scenario_path` — repo-relative path to the canonical simulated-manual scenario.
@@ -116,11 +116,13 @@ The process below mirrors `plan-mode-cc-workflows`: precondition gate, per-scena
 // Worktree-isolation check — must be the first action in this gate.
 // Rejects before any field resolution if the skill is not running inside
 // a `.claude/worktrees/<name>/` checkout.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling before dispatching the scenario: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `test.mode` resolves to `"cc-workflows"` OR `HIVE_TEST_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `scenario_path`, `scenario`, `story`, and `story_path` are present.
+Resolve runtime and tooling before dispatching the scenario: verify CC runtime version `>= 2.1.217`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `test.mode` resolves to `"cc-workflows"` OR `HIVE_TEST_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `scenario_path`, `scenario`, `story`, and `story_path` are present.
 
 Runtime field resolution must preserve source attribution:
 
@@ -137,7 +139,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -145,7 +147,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows test mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows test mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -178,8 +180,8 @@ Phase 1 dispatches the scenario via the Workflow tool. Dispatch granularity is p
    - **No Codex routing inside cc-workflows mode.** Every `agent()` call MUST use the default workflow subagent — do NOT pass `agentType: "codex:codex-rescue"` (or any other Codex `agentType`) even when `agent_backends` would route the tester agent to Codex in other modes. The cc-workflows substrate runs each agent INLINE within the Claude orchestrator so that the returned `<result>` IS the verdict payload, not a pointer to out-of-band work.
    - **`opts.model` is REQUIRED on every `agent()` call.** Before assembling the Workflow script, import and call the model-tier resolver for the tester role:
      ```js
-     import { resolveModelTier } from 'hive/lib/cc-workflows-model-tier.mjs';
-     const { tier, source } = resolveModelTier('tester', { config: hive_config });
+     const { tier, source } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona: 'tester', config: hive_config }), encoding: 'utf8' }));
+     // Python equivalent of resolveModelTier('tester', { config: hive_config }).
      // assembled agent() call must carry opts.model:
      // agent(prompt, { schema, phase, label, model: tier })
      ```
@@ -356,15 +358,15 @@ Runtime and branch configuration:
 | `test.mode` | `"cc-workflows"` |
 | `HIVE_TEST_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
-Runtime source priority is resolver-owned (`test-dispatch` Step 0), but every reject must report the consulted source in `field_sources`. Test agent routing uses `hive/lib/cc-workflows-model-tier.mjs`; the behavior contract follows `hive/workflows/steps/test/simulated-manual.md`.
+Runtime source priority is resolver-owned (`test-dispatch` Step 0), but every reject must report the consulted source in `field_sources`. Test agent routing uses `hive/lib/cc_workflows_model_tier.py`; the behavior contract follows `hive/workflows/steps/test/simulated-manual.md`.
 
 ## Reuses (atomic deps)
 
-- `hive/lib/cc-workflows-preconditions.mjs` — `assertWorktreeIsolation()` called at Step 0.
-- `hive/lib/cc-workflows-model-tier.mjs` — model-tier resolver; consumed at Step 1 for every `agent()` call.
+- `hive/lib/cc_workflows_preconditions.py` — worktree-isolation precondition called at Step 0.
+- `hive/lib/cc_workflows_model_tier.py` — model-tier resolver; consumed at Step 1 for every `agent()` call.
 - `hive/lib/scenarios/load.mjs` — canonical `loadScenario(path)` validator; must succeed before dispatch.
 - `hive/workflows/steps/test/simulated-manual.md` — canonical executor contract the test agent must follow.
 - `hive/references/episode-schema.md` — episode marker format family.

@@ -11,6 +11,12 @@
       "args": [
         "hive/lib/multica-story-dispatch/mcp-tools.mjs"
       ]
+    },
+    "approval-actions": {
+      "command": "node",
+      "args": [
+        "hive/lib/approval/mcp-server.mjs"
+      ]
     }
   }
 }

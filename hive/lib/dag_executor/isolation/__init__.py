@@ -20,7 +20,7 @@ from .nesting import (
     detect_outer_worktree,
     is_meta_meta_optimize_worktree,
 )
-from .worktree import WorktreeManager
+from .worktree import WorktreeManager, WorktreePreparation
 
 __all__ = [
     "IsolationError",
@@ -30,6 +30,7 @@ __all__ = [
     "WorktreeContaminationError",
     "WorktreeLifecycleError",
     "WorktreeManager",
+    "WorktreePreparation",
     "decide_run_worktree",
     "detect_outer_worktree",
     "is_meta_meta_optimize_worktree",

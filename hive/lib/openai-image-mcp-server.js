@@ -1,8 +1,14 @@
-'use strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { negotiateMcpProtocolVersion } from './mcp-protocol-version.js';
 
-const fs = require('node:fs');
-const path = require('node:path');
-const crypto = require('node:crypto');
+// 'openai' is an optional runtime dependency (SDK may not be installed);
+// createRequire gives CJS-style require() semantics for it inside this ESM
+// file. Callers may still inject deps.requireFn to stub it out in tests.
+const defaultRequire = createRequire(import.meta.url);
 
 const SERVER_NAME = 'openai-image';
 const SERVER_VERSION = '1.0.0';
@@ -135,7 +141,7 @@ function normalizeOpenAIError(error) {
 }
 
 function createOpenAIClient({ apiKey, OpenAIClass, requireFn }) {
-  const requireModule = requireFn || require;
+  const requireModule = requireFn || defaultRequire;
   let OpenAI = OpenAIClass;
   if (!OpenAI) {
     try {
@@ -333,7 +339,7 @@ function normalizeImageOutputs({ data, outputDir, prefix, fsModule }) {
 }
 
 async function defaultFileConverter(imagePath, options) {
-  const requireModule = (options && options.requireFn) || require;
+  const requireModule = (options && options.requireFn) || defaultRequire;
   let toFile;
   try {
     ({ toFile } = requireModule('openai'));
@@ -411,7 +417,7 @@ async function handleRpcMessage(message) {
         jsonrpc: '2.0',
         id: message.id,
         result: {
-          protocolVersion: message.params && message.params.protocolVersion ? message.params.protocolVersion : '2024-11-05',
+          protocolVersion: negotiateMcpProtocolVersion(message.params && message.params.protocolVersion),
           capabilities: { tools: {} },
           serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         },
@@ -472,7 +478,7 @@ function startServer() {
   });
 }
 
-module.exports = {
+export {
   DEFAULT_EDIT_VARIANTS,
   DEFAULT_GENERATE_VARIANTS,
   DEFAULT_IMAGE_VARIANTS,
@@ -494,6 +500,6 @@ module.exports = {
   toolListResult,
 };
 
-if (require.main === module) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   startServer();
 }

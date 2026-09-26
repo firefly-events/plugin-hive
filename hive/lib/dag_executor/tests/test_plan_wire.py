@@ -98,16 +98,36 @@ def test_multica_example_log_uses_dag_plan_graph():
 
 
 def test_default_mode_routes_to_direct_not_dag():
-    """When backend is unset, routing falls through to direct/TeamCreate."""
+    """When backend is unset, routing falls through to direct (auto-spawn)."""
     text = skill_text()
-    # The `agent_backends-unset` reason should still route to TeamCreate (direct)
+    # The `agent_backends-unset` reason should still route to direct (auto-spawn)
     assert "agent_backends-unset" in text, (
         "planning-routing must still define agent_backends-unset fallback reason "
         "for default (unset backend) mode"
     )
     # The default path must not be removed
-    assert "Direct path" in text or "TeamCreate" in text, (
-        "planning-routing must preserve the direct/TeamCreate path for default mode"
+    assert "direct" in text, (
+        "planning-routing must preserve the direct path for default mode"
+    )
+    # TeamCreate must be absent — the migration retired it in favour of auto-spawn
+    assert "TeamCreate" not in text, (
+        "planning-routing must not reference the deleted TeamCreate tool; "
+        "direct path uses natural-language auto-spawn (v2.1.178+)"
+    )
+
+
+def test_per_persona_dispatch_not_combined_team_prompt():
+    """planning-routing must dispatch per persona, not collapse all into one prompt."""
+    text = skill_text()
+    # Must say one scoped prompt per direct persona (not a combined prompt)
+    assert "one scoped prompt per direct persona" in text, (
+        "planning-routing must specify rendering one scoped prompt per direct persona, "
+        "not a single combined-team prompt"
+    )
+    # Must explicitly prohibit the combined-team anti-pattern
+    assert "Do NOT render one combined prompt" in text, (
+        "planning-routing must explicitly prohibit rendering a combined prompt listing "
+        "every persona (must not collapse per-persona dispatch)"
     )
 
 
@@ -116,9 +136,9 @@ def test_local_fallback_not_dag_when_unset():
     text = skill_text()
     # The `resolve_spawn_binding` / DAG dispatch appears only in the multica branch
     # Confirm the default/local path section does not mention DAG dispatch
-    # The TeamCreate path should still exist for direct-routed personas
-    assert "TeamCreate" in text, (
-        "Direct path (TeamCreate) must be preserved for local fallback when "
+    # The direct (auto-spawn) path should still exist for direct-routed personas
+    assert "direct" in text, (
+        "Direct path (auto-spawn) must be preserved for local fallback when "
         "planning.mode is unset or default"
     )
 

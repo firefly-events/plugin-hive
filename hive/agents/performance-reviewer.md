@@ -1,7 +1,7 @@
 ---
 name: performance-reviewer
 description: "Reviews code for algorithmic complexity, memory allocation, I/O patterns, and optimization opportunities. Narrow focus only."
-model: sonnet
+model: claude-sonnet-5
 color: yellow
 knowledge:
   - path: ~/.claude/hive/memories/performance-reviewer/

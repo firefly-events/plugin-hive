@@ -1,7 +1,0 @@
-step_id: test
-story_id: c-5a-dispatch-module-and-config-schema
-epic_id: task-tracking-adapter-abi
-agent: tester
-status: completed
-verdict: 8/8 PASS
-test_results: "16/16 unit tests + 6 integration smoke checks. Both adapters resolve. Telemetry fires once in warning, suppressed in hard. Both configs documented + lint clean."

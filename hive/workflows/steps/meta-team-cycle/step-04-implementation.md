@@ -38,6 +38,8 @@ Execute each approved proposal's implementation plan. Write new files, add secti
 ### 1. Process proposals in priority order
 For each approved proposal (highest priority first):
 
+**Maintain working notes during execution.** For a multi-phase story, keep a running scratchpad at `.pHive/task-notes/{story-id}/` — record which proposals are done or blocked, decisions taken, and open questions so you stay coherent across phases. Read your own notes back when resuming. These notes are ephemeral working memory: WRITE-during-execution, DISCARD-at-story-close. They are NOT memory and are NOT a persistent control-plane output — they never enter insight staging or memory promotion (see `references/agent-memory-schema.md` → Ephemeral Working Memory), and they are exempt from the structured `changes_made` tracking above.
+
 #### 1a. Re-read the target file(s)
 Before making any change, read the current content of every file in the implementation plan. Confirm:
 - The issue the proposal addresses is still present (it might have been fixed by a prior proposal in the same cycle)

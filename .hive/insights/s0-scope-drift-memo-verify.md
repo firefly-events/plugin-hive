@@ -1,5 +1,0 @@
-# Insights — s0-scope-drift-memo-verify
-
-- The `feedback_scope_drift_emit_sites` memo is strictly about `scope_drift_score` (hive/lib/scope_drift.py, story ed-3): three callsites — `plan:phase-c`, `execute:story`, `review:complete`. It never mentions KG predicate emits. The research-brief's worry that the "3 emit sites" rule constrains KG emits was a category error: the memo's bar ("would a divergence here change what a human or aggregator does next?") applies to *drift-score* emit sites, not to KG fact emission. Design D2 stands as-is.
-- Gotcha for future verifiers: the memo file lives in user memory (`~/.claude/projects/-Users-don-Documents-plugin-hive/memory/`), NOT in the repo. Updating it is a direct filesystem edit on the host — it cannot be carried by the epic branch commit. Only this insight file is committable. If a story's files_to_touch points at user memory, expect the git diff for that story to contain only the insight artifact.
-- Memo's `name:` frontmatter uses kebab-case (`feedback-scope-drift-emit-sites`) while the filename uses snake_case (`feedback_scope_drift_emit_sites.md`). Search by either when cross-referencing.

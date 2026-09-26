@@ -36,6 +36,41 @@ Include enough context that the agent reading this in a future session understan
 both what to do and why it matters without needing to re-investigate.}
 ```
 
+### Required incident fields for `override`
+
+An `override` insight captured because an owner corrected the agent's work, or because
+an audit conclusion was overturned, MUST include a named-incident block in the body —
+not just a one-line "X was wrong, actually Y". Free-form override prose without these
+fields is incomplete and must be rejected at capture time:
+
+```markdown
+---
+name: {short descriptive title}
+description: "{one-line summary}"
+type: override
+agent: {agent-name}
+last_verified: {YYYY-MM-DD}
+ttl_days: null
+source: agent
+---
+
+**What happened:** {the incorrect action, conclusion, or assumption that was corrected}
+**How detected:** {who/what caught it — owner review, overturned audit, failing test, etc.}
+**Correction (verbatim):** {the owner's correction or the audit's revised conclusion,
+quoted as given — do not paraphrase away the specific wording}
+**Guardrail:** {what changes going forward so the same mistake isn't repeated — a check,
+a convention, a file to consult}
+```
+
+This applies only to `override` insights that originate from an owner correction or an
+overturned audit conclusion. An `override` that supersedes a stale codebase fact with no
+correction/audit event behind it (e.g. "the config moved from X to Y") does not need the
+incident block — only the correction/audit-driven case does.
+
+An `override` insight missing any of the four fields (`What happened`, `How detected`,
+`Correction (verbatim)`, `Guardrail`) is malformed and must be flagged rather than
+promoted as-is.
+
 ### TTL guidelines
 
 | Type | Default ttl_days | Rationale |

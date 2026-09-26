@@ -8,9 +8,10 @@ finalization steps consume. Centralizing the layout here prevents the
 wrapper (`hive/lib/openai-image-mcp-server.js`), the skill, and the
 brand-system from each inventing their own conventions.
 
-This document is the single source of truth for the layout. The
-machine-checkable subset is implemented in
-`hive/lib/logo-exploration-validator.js`.
+This document is the single source of truth for the layout. Earlier versions
+also shipped a dedicated machine-checkable validator, but it was removed after
+an exhaustive caller audit found no executable consumers. Producers and
+consumers should treat the rules below as the contract.
 
 ---
 
@@ -77,8 +78,8 @@ are added later in the lifecycle and their absence is not an error.
 | `selected.yaml` | Human-authored selection record (schema below). Absent until a human picks a winner. | Human reviewer |
 | `edits/` | Refinement outputs from `/logo-exploration --refine`. Each filename encodes which selected candidate was the basis: `direction-<D>-candidate-<C>-edit-<N>.png` (e.g. `direction-2-candidate-1-edit-0.png` for candidate `1.png` from `direction-2/`). | `/logo-exploration --refine` |
 
-Anything not listed above is unexpected; the validator surfaces it as a
-warning so consumers can decide whether to fail or proceed.
+Anything not listed above is unexpected; boundary validation should surface it
+as a warning so consumers can decide whether to fail or proceed.
 
 ---
 
@@ -98,7 +99,8 @@ notes: |          # optional free text
   runners-up — keep them around for the edits round.
 ```
 
-Constraints enforced by the validator (when the file exists):
+When validation is applied at an integration boundary, enforce these
+constraints (when the file exists):
 
 - `direction` MUST be a positive integer that has a corresponding
   `direction-<direction>/` subdirectory.
@@ -131,20 +133,9 @@ does not require `.gitkeep` — it is a git-tracking convenience only.
 
 ---
 
-## Validator
+## Validation
 
-`hive/lib/logo-exploration-validator.js` exposes
-`validateExplorationDir(dirPath)`. It returns:
-
-```js
-{
-  valid: boolean,        // true when no errors
-  errors: string[],      // hard failures: missing required files, malformed selected.yaml
-  warnings: string[],    // soft notices: unexpected files, missing optional pieces
-}
-```
-
-The validator is purely structural — it does NOT open PNGs or render the
-HTML. It is safe to run against in-progress directories.
-
-See `tests/logo-exploration-validator.test.js` for the contract examples.
+The contract is intentionally structural: it does not require opening PNGs or
+rendering the HTML. Integrations that need validation should apply the rules
+above at their own boundary, including the required files and the
+`selected.yaml` constraints.

@@ -30,6 +30,7 @@ from .schema import (
 )
 from .store import (
     create,
+    find_latest_successful,
     load,
     mark_completed,
     mark_failed,
@@ -37,6 +38,7 @@ from .store import (
     runs_root,
     save,
     set_last_successful_node,
+    set_node_hash,
     set_node_output,
     set_node_status,
     set_status,
@@ -62,6 +64,7 @@ __all__ = [
     "archive_terminal_runs",
     "create",
     "default_archive_dest",
+    "find_latest_successful",
     "load",
     "mark_completed",
     "mark_failed",
@@ -71,6 +74,7 @@ __all__ = [
     "runs_root",
     "save",
     "set_last_successful_node",
+    "set_node_hash",
     "set_node_output",
     "set_node_status",
     "set_status",

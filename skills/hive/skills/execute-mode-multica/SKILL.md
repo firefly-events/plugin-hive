@@ -138,7 +138,7 @@ For each story in `unblocked_stories[]` at this depth:
 
 3. **Brief write.**
    - Read `hive_config.agent_backends?.developer` (the `developer` role is the persona Multica's bootstrapped agent runs under). If it equals `'codex'` **and we are in single-agent mode** (`assigneeKind === 'agent'`), pass `{ codexInstruction: true }` so the brief instructs the inner Claude Code session to use `/codex:rescue` for implementation. In **squad mode** the green member already runs on the native codex runtime, so do NOT inject `codexInstruction` — omit options. Otherwise omit options for backward-compatible behavior.
-   - Call `serializeStoryBrief(story, (assigneeKind === 'agent' && codexInstruction) ? { codexInstruction: true } : {})` to produce Markdown.
+   - `dispatchingPersona` here is `'developer'` (the bootstrapped single-agent persona). Call `await buildStoryBrief(story, { dispatchingPersona: 'developer', ...(assigneeKind === 'agent' && codexInstruction ? { codexInstruction: true } : {}) })` to produce Markdown — `buildStoryBrief` (not the sync `serializeStoryBrief`) is required so the persona stamp and Prior Experience section are injected on this dispatch route too.
    - Resolve `requestedRef` from the current epic branch/ref (for example `feat/multica-integration-fixes`) and include it in the issue brief as the required repository ref for the agent task.
    - Call `ensureIssueBriefMatches(serverUrl, token, workspaceId, issueUuid, brief)`.
    - If the issue description has drifted, the helper updates it with `PUT`.
@@ -194,7 +194,7 @@ For each story in `unblocked_stories[]` at this depth:
 
 3. **Brief write.**
    - Determine the dispatching persona name for this story (e.g. `backend-developer`, `researcher`). Load `.pHive/multica/agents.yaml` once per `/execute` run (cache the parsed result; do not re-read per story).
-   - Call `serializeStoryBrief(story, { dispatchingPersona, agents, agentBackends, integrationBranch })` to produce Markdown, where:
+   - Call `await buildStoryBrief(story, { dispatchingPersona, agents, agentBackends, integrationBranch })` to produce Markdown — `buildStoryBrief` (not the sync `serializeStoryBrief`) is required so the persona stamp AND the Prior Experience section (S2 harvest attribution) land on this dispatch route, where:
      - `dispatchingPersona` is the persona name string
      - `agents` is the `agents[]` array from the parsed agents.yaml
      - `agentBackends` is `hive_config.agent_backends` (an object mapping persona name → `'codex'|'claude'`)
@@ -301,6 +301,21 @@ const terminal = await pollTaskUntilTerminal({
 ```
 
 A timeout-cancelled story returns `status: 'cancelled'` and `notes: 'timeout after Ns'`; transport failure after 3 consecutive errors throws `TRANSPORT` (caller catches per-story and writes a failure marker — see Failure modes).
+
+**wr-5 investigation finding — out of reach for the `SubagentStop` completion
+contract:** this dispatch path does not bind `SubagentStop` and does not need
+`agent-spawn/SKILL.md`'s `## Completion Contract` block appended anywhere in
+its prompt assembly. A Multica-dispatched story is a fully independent
+Multica-managed session (its own top-level agent run, not a subagent of the
+orchestrator's session — the same shape as this very `/execute` run when
+launched via Multica), so `SubagentStop` structurally cannot fire for it.
+`pollTaskUntilTerminal` above (issue status via the Multica API) IS this
+path's completion signal and is unrelated to `.hive-task-status.json` /
+`hooks/notify-agent-complete.sh`. Confirmed against `hive/lib/dag_executor/
+executor/handlers/agent.py`'s `MulticaAgentSpawn`, which drives the same
+dispatch+poll shape from the Python DAG executor. See
+`agent-spawn/SKILL.md` §7.2 for the full carve-out list (cmux, Bash
+`run_in_background`, `LocalAgentSpawn`, and this path).
 
 ### Step 3: Episode marker per terminal
 
@@ -521,7 +536,7 @@ execution:
 
 - `hive/lib/multica-story-dispatch/index.mjs` (s2) — 5 dispatch helpers:
   - `resolveAgentUuidByName`
-  - `serializeStoryBrief`
+  - `buildStoryBrief`
   - `ensureIssueBriefMatches`
   - `dispatchStoryToAgent`
   - `moveOutOfBacklogIfNeeded`

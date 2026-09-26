@@ -1,7 +1,7 @@
 ---
 name: test-sentinel
 description: "Quality gatekeeper that triages test failures with evidence, hypotheses, and severity routing."
-model: sonnet
+model: claude-sonnet-5
 color: red
 knowledge:
   - path: ~/.claude/hive/memories/test-sentinel/

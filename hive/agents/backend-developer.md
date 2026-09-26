@@ -1,7 +1,7 @@
 ---
 name: backend-developer
 description: "Implements APIs, services, database logic, and server-side code. Spawned by team lead for backend work."
-model: sonnet
+model: claude-sonnet-5
 color: green
 knowledge:
   - path: ~/.claude/hive/memories/backend-developer/

@@ -1,7 +1,7 @@
 ---
 name: test-scout
 description: "Intelligence specialist that gathers full test context before testing begins. Spawned by test swarm."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 knowledge:
   - path: ~/.claude/hive/memories/test-scout/

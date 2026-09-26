@@ -88,11 +88,13 @@ persona`; everything else is structurally identical.
 
 ```js
 // Worktree-isolation check — must be the first action in this gate.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling: verify CC runtime `>= 2.1.154`; read `claude --version` when
+Resolve runtime and tooling: verify CC runtime `>= 2.1.217`; read `claude --version` when
 available; otherwise rely on Workflow tool presence as proxy. Verify `execution.mode`
 resolves to `"cc-workflows"` OR `HIVE_DESIGN_MODE=cc-workflows` is set. Confirm
 `include_constraints`, `design_context`, and `epic_handle` are present.
@@ -112,7 +114,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -120,7 +122,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows design mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows design mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -176,8 +178,8 @@ For each persona in `personaSet[]` (in order):
 
    **`opts.model` is REQUIRED on every `agent()` call:**
    ```js
-   import { resolveModelTier } from '../../../hive/lib/cc-workflows-model-tier.mjs';
-   const { tier, source } = resolveModelTier(persona, { config: hive_config });
+   const { tier, source } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona, config: hive_config }), encoding: 'utf8' }));
+   // Python equivalent of resolveModelTier(persona, { config: hive_config }).
    // agent(prompt, { schema, phase, label, model: tier })
    ```
    Resolver reads `model_overrides` (runtime promotion) then `model_tiers` (base assignment)
@@ -369,13 +371,13 @@ HIVE_DESIGN_MODE=cc-workflows
 | `execution.mode` | `"cc-workflows"` |
 | `HIVE_DESIGN_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 ## Reuses (atomic deps)
 
-- `hive/lib/cc-workflows-preconditions.mjs` — `assertWorktreeIsolation()` called at Step 0.
-- `hive/lib/cc-workflows-model-tier.mjs` — model-tier resolver; consumed at Step 2 for
+- `hive/lib/cc_workflows_preconditions.py` — worktree-isolation precondition called at Step 0.
+- `hive/lib/cc_workflows_model_tier.py` — model-tier resolver; consumed at Step 2 for
   every `agent()` call.
 - `hive/lib/mode-resolver.mjs` — 5-tier `resolveMode('HIVE_DESIGN_MODE', ctx)`.
 - `hive/lib/task-tracking-dispatch/` — reserved for future per-persona tracker integration.
@@ -413,10 +415,10 @@ Key references:
 | Prior persona outputs flow forward | animations receives accessibility result; ui-designer receives both |
 | Skill does NOT run git commit/add/push | Orchestrator commits after return from file-list payloads |
 | No Codex routing in cc-workflows mode | Every `agent()` call uses the default workflow subagent; no Codex agentType |
-| opts.model REQUIRED on every agent() call | resolveModelTier() from cc-workflows-model-tier.mjs for every persona |
+| opts.model REQUIRED on every agent() call | Python model-tier resolver for every persona |
 | Defensive args parse contract | `const a = typeof args === 'string' ? JSON.parse(args) : args;` at script-body top |
 | Insight-capture suffix on every agent() prompt | Persona-substituted; mandatory on each dispatched agent |
-| assertWorktreeIsolation() at Step 0 | Import from `hive/lib/cc-workflows-preconditions.mjs`; must be first action |
+| worktree isolation at Step 0 | Invoke `hive/lib/cc_workflows_preconditions.py`; must be first action |
 | 5-tier mode resolution | `resolveMode('HIVE_DESIGN_MODE', ctx)` via mode-resolver.mjs |
 | No fallback design mode inside this skill | Step 0 reject returns structured `precondition_failed`; `design-dispatch` owns fallback |
 | ui-designer failure = run failure | Prior constraint persona markers preserved; summary flags failed |

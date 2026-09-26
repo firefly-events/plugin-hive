@@ -10,7 +10,30 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { assertWorktreeIsolation } from '../cc-workflows-preconditions.mjs';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+
+// Resolve the port relative to this test file so the suite works regardless of
+// the runner's cwd (vitest runs from the repo root, not hive/lib).
+const PRECONDITIONS_PY = path.join(import.meta.dirname, '..', 'cc_workflows_preconditions.py');
+
+function assertWorktreeIsolation(cwd) {
+  let raw;
+  try {
+    raw = execFileSync('python3', [PRECONDITIONS_PY], {
+      input: JSON.stringify({ cwd }), encoding: 'utf8',
+    });
+  } catch (error) {
+    raw = error.stdout;
+  }
+  const result = JSON.parse(raw);
+  if (result.ok !== true) {
+    const error = new Error(result.error);
+    error.precondition_failed = result.precondition_failed;
+    error.field_sources = result.field_sources;
+    throw error;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Test 1: throws on a main-checkout (non-worktree) cwd

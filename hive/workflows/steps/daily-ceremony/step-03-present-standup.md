@@ -109,7 +109,9 @@ This is the most critical section — present with clear action items:
 ```
 
 ### 5. Format dependency graph
-Show the dependency relationships between remaining stories:
+Show the dependency relationships between remaining stories.
+
+**Dependency Graph — legend:** `→` = depends on; `✗ blocked by` = blocked; `(independent)` = no dependencies. (Plain-text graph, not Mermaid — kept terminal-readable.)
 ```
 ### Dependency Graph
 {story-A} → {story-B} → {story-C}
@@ -124,7 +126,37 @@ Summarize key agent memories that affect today's work:
 - [{agent}] {memory-name}: {one-line summary}
 ```
 
-### 7. Present the full standup report
+### 7. Compute and include cost burn rate
+
+Scan only the **completed** story markers in the **current epic(s)** for `tokens.cost_usd` — never the whole `.pHive/episodes/` tree, or unrelated epics and in-flight markers will inflate the total. Use Python (PyYAML — already a Hive dependency) when summation logic is needed:
+
+```python
+import yaml, pathlib
+
+# epic_ids: the epic(s) this standup covers — do NOT glob all episodes.
+total_cost = 0.0
+for epic_id in epic_ids:
+    for path in pathlib.Path(".pHive/episodes", epic_id).glob("**/*.yaml"):
+        data = yaml.safe_load(path.read_text()) or {}
+        if data.get("status") != "completed":
+            continue  # skip in-flight / failed markers
+        cost = (data.get("tokens") or {}).get("cost_usd")
+        if cost is not None:
+            total_cost += float(cost)
+```
+
+- Markers without `cost_usd` contribute zero — no error, no skip.
+- If no markers have `cost_usd`, omit the burn-rate line (do not show `$0.00 / unknown`).
+- When at least one marker has `cost_usd`, append this section to the standup report:
+
+```
+### Credit Burn Rate
+  Session spend : $X.XXXX
+  Credit pool   : {pool size from config, or "unknown"}
+  Burn rate note: {e.g. "Est. N sessions remaining" or omit if pool unknown}
+```
+
+### 8. Present the full standup report
 Output the complete report to the user. End with:
 ```
 ### Ready for Planning
@@ -141,6 +173,7 @@ Output the complete report to the user. End with:
 - [ ] Blocked and failed stories have clear action items
 - [ ] Dependency graph shows which stories are available vs. blocked
 - [ ] Relevant agent memories are summarized
+- [ ] Credit burn-rate line shown when any completed marker carries `cost_usd`; omitted (not zero-printed) when none do
 - [ ] Report is presented to the user (not just computed internally)
 
 ## FAILURE MODES

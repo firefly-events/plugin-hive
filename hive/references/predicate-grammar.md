@@ -159,6 +159,56 @@ The walker emits the `predicate_evaluated` event before deciding to
 skip the step. Run telemetry (`events/<run_id>.jsonl`) is the audit
 surface — predicate failures are visible there, not in stderr.
 
+## Boolean convergence signals (`skip_when` on unrolled loops)
+
+Loop templates (`loop_config.feature` + `convergence_signal`) are expanded at
+load time into round copies by the unroll expander — see
+[`loop-unroll-migration.md`](loop-unroll-migration.md). Each round `k > 1`
+carries a `skip_when:` predicate that short-circuits the loop once an earlier
+round converged. Convergence **must ride a boolean output**, not prose.
+
+**The pattern.** The loop body's reviewer/tester step declares a boolean output
+(the `convergence_signal`) and the expander emits, for round `k`, an OR-chain
+over **all** prior rounds (a converged-latch — a `k-1`-only reference fails to
+short-circuit past the first skipped round):
+
+```
+$<producer>__r1.output.<signal> == true || … || $<producer>__r{k-1}.output.<signal> == true
+```
+
+Canonical signals: `review_passed` (review_converge), `tests_green`
+(tdd_red_green), `behavior_satisfied` (bdd_converge), `coverage_satisfied`
+(test_swarm). Each is declared `type: json` on the producer and set to a real
+`true`/`false` boolean — never a string.
+
+**Why boolean, not prose — the trap this epic fixed.** The grammar accepts only
+`true|false|null|int|float` literals and dot-path field refs (see *Disallowed*
+above). A **prose** convergence predicate (e.g. `review passed`) is not
+grammar-legal, so it can never evaluate `true`. Under `skip_when`'s fail-closed
+direction (below) that means the loop would never short-circuit — every round
+re-runs to the ceiling. Convergence therefore rides a declared boolean the
+reviewer/tester step **must emit**; if it doesn't, the loop simply runs
+`max_rounds` and the terminal gate decides.
+
+**`skip_when` is fail-closed-to-RUN — the INVERSE of `when:`.** `when:`
+fail-closes to **False** (skip the step). `skip_when` fail-closes to **False for
+the skip decision, i.e. RUN the node**: an empty, unparseable, or missing-field
+`skip_when` predicate runs the node rather than skipping it. This is deliberate —
+a loop round that has **not** yet converged must never be silently dropped. So a
+prose/garbage `skip_when` runs (does not skip); only a genuinely-`true`
+grammar-legal predicate skips.
+
+| `skip_when` case | Skip? | Effect |
+|------------------|-------|--------|
+| Empty / missing | No | Node runs (round 1 always runs) |
+| Parse failure (prose) | No | Node runs — non-converged round never dropped |
+| Dot-path field missing (skipped prior round) | No | Node runs — OR-chain over ALL prior rounds covers gaps |
+| Grammar-legal predicate → `true` | **Yes** | Round skipped (an earlier round converged) |
+
+The terminal gate after the loop reads the **last successful round**'s signal, so
+an early-converged run integrates while a never-converged run (all rounds ran,
+signal false at the ceiling) still blocks — preserving the bug-#26 hard-block.
+
 ## trigger_rule — `none_failed_min_one_success`
 
 The single supported policy. Applied at multi-upstream joins

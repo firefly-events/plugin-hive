@@ -21,7 +21,7 @@ optional `pane_mode` (`one-shot` | `persistent`, default: `one-shot`).
 
 ## When NOT to Use
 
-- Any task where Claude is the resolved backend (default path — use TeamCreate)
+- Any task where Claude is the resolved backend (default path — use `Agent(name:)`)
 - Non-macOS machines (cmux is macOS-only — hard-fail at pre-flight)
 
 **Supported personas (PoC):** `backend-developer`, `reviewer`,
@@ -50,19 +50,19 @@ the Claude backend for this persona.
 The `Supported personas (PoC)` and `Known-incompatible personas` lists above
 form the contract that the planning skill (`skills/plan/SKILL.md`) consults
 when deciding whether to route a planning teammate through Codex
-(`agent_backends: <persona>: codex`) or fall back to direct TeamCreate.
+(`agent_backends: <persona>: codex`) or fall back to direct `Agent(name:)`.
 
 Plan-skill routing behavior for each case:
 - Persona in `Supported personas` AND `agent_backends[persona] == codex`:
   route through codex-invoke. INFO-log reason: `no-fallback-needed`.
 - Persona in `Known-incompatible personas` (e.g., `ui-designer`): fall back
-  to direct TeamCreate regardless of `agent_backends` value. INFO-log
+  to direct `Agent(name:)` regardless of `agent_backends` value. INFO-log
   reason: `known-incompatible`.
 - Persona with `agent_backends[persona] == codex` but persona NOT in
-  `Supported personas`: fall back to direct TeamCreate. INFO-log reason:
+  `Supported personas`: fall back to direct `Agent(name:)`. INFO-log reason:
   `unvalidated-persona`.
 - Persona with `agent_backends[persona]` unset or `agent_backends` absent
-  entirely: fall back to direct TeamCreate (default path, no routing
+  entirely: fall back to direct `Agent(name:)` (default path, no routing
   configured). INFO-log reason: `agent_backends-unset`.
 
 ### Structured INFO-log template consumed by plan-skill
@@ -72,7 +72,7 @@ using this exact 4-field template (see `skills/plan/SKILL.md` Step 0.2 for
 the emission point):
 
 ```
-[info] planning routing: persona={X} requested={codex|direct|unset} path={codex-invoke|TeamCreate} reason={...}
+[info] planning routing: persona={X} requested={codex|direct|unset} path={codex-invoke|Agent} reason={...}
 ```
 
 Allowed `reason` values:

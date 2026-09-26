@@ -8,6 +8,24 @@
 
 Defines how artifacts transfer between swarms (planning → dev → testing → security). Each swarm produces outputs that the next swarm consumes. The handoff carries structured context, not just document blobs.
 
+## Trust Boundary: SendMessage vs Filesystem Handoff
+
+A team is an ephemeral, session-bound intra-session coordination unit. A swarm
+is the wider phase-level unit that spans planning → development → testing →
+security. A team is a strict subset of a swarm: team ⊂ swarm.
+
+Use `SendMessage` for same-session teammates. It is the intra-team mailbox:
+ephemeral, session-bound, and not auditable after the session ends. Use it for
+coordination that only matters while the current team is alive, such as a lead
+routing a bug report to an idle developer teammate.
+
+Use filesystem handoffs for phase-to-phase or swarm-to-swarm transfer. A
+handoff is cross-swarm, durable, and auditable: it is persisted to disk, survives
+session boundaries, and can be reviewed through normal git history. That is why
+cross-swarm coordination uses `.pHive/handoffs/{handoff-id}.yaml` instead of
+`SendMessage`; the receiving swarm needs durable context, not a transient
+mailbox message.
+
 ## Handoff Schema
 
 ```yaml

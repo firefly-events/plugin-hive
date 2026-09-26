@@ -94,6 +94,39 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
 
 5. Proceed with the rest of `/plan` after these defaults are in place.
 
+## Headless Mode
+
+Epic `headless-question-protocol`, story `hqp-5-plan-headless-integration`. This
+skill has two blocking prompt points: the branch-switch confirmation (Phase 0 step
+0) and step 14b's release-intent question. Before either, call
+`hive/lib/runtime_mode.py`'s `detect_interactive_mode()` (Python) or
+`hive/lib/runtime_mode.js`'s `detectInteractiveMode()` (JS).
+
+**Interactive** (`mode: "interactive"`): unchanged — prompt exactly as written at
+each site below.
+
+**Headless** (`mode: "headless"`): call `hive/lib/question_gateway.py`'s
+`ask_or_emit(skill="plan", phase="<phase-id>", questions=[...])` (Python) or
+`hive/lib/question_gateway.js`'s
+`askOrEmit({skill: "plan", phase: "<phase-id>", questions: [...]})` (JS) instead. On
+`resolved: false`, print the `AWAITING_ANSWERS` status and stop this `/hive:plan`
+invocation here; the orchestrator answers the envelope and re-invokes `/hive:plan`,
+which resumes at this phase. On `resolved: true`, use the answer exactly as if typed
+interactively — including this skill's existing fallback/default logic for an
+unrecognized or missing answer (see step 14b below), which is unchanged by this
+protocol.
+
+| Phase id | Site |
+|---|---|
+| `branch-switch-confirm` | Phase 0 step 0 — confirm switching to `feat/{epic-id}` from a different `feat/*` branch |
+| `14b-version-bump` | Step 14b — release-intent question (`major \| minor \| patch \| none`) |
+
+**Correction from planning (story `hqp-5`):** the plan skill's sidecar-retention
+question (step 14c in a newer plugin release) is not present in this repo's current
+`skills/plan/SKILL.md` — only the branch-switch confirm and step 14b exist here. This
+protocol wires what actually exists; step 14c will need the same treatment when/if it
+lands on this branch.
+
 ## Process
 
 ### Phase 0: Assemble Planning Team
@@ -103,7 +136,7 @@ See [`hive/references/skill-prelude.md`](../../hive/references/skill-prelude.md)
    - Check the working tree first. If there are uncommitted changes, stop immediately with guidance to commit or stash before re-running `/hive:plan`. Do not create, switch, or write anything while the tree is dirty.
    - Read the current branch name.
    - If already on `feat/{epic-id}`, do nothing and continue.
-   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}`.
+   - If on a different `feat/*` branch, prompt the user for confirmation before switching to `feat/{epic-id}` (headless: phase `branch-switch-confirm` — see Headless Mode above).
    - If `feat/{epic-id}` already exists locally, check it out. Otherwise create it from the current HEAD and switch to it.
    - Only after `feat/{epic-id}` is active may the skill write planning artifacts such as the research brief, design discussion, H/V plans, structured outline, or story YAMLs.
 
@@ -154,10 +187,11 @@ the parsed consumer `.pHive/hive.config.yaml`. Consume `runner_path` and
 3. Call:
    ```python
    from hive.lib import dag_executor
+   from hive.lib.dag_executor.run import resolve_spawn_binding
 
    result = dag_executor.run(
        workflow_path='hive/workflows/plan.workflow.yaml',
-       binding="local",
+       binding=resolve_spawn_binding(flow="planning")[0],
        flow='planning',
        context={'requirement': requirement},
        run_state_path=run_state_path,
@@ -224,15 +258,10 @@ existing `.pHive/epics/{epic-id}/docs/research-brief.md` if present. The
 pre-flight substeps below (0a git_flow resolution, 0 prior-decision query) still
 run — they are not research and downstream phases depend on them.
 
-0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), call `resolveGitFlow({ cwd })` from `hive/lib/git_flow.mjs` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
+0a. **Pre-flight: resolve git_flow (pe-5).** Immediately after the kickoff gate passes (and before any researcher / writer dispatch), invoke `hive/lib/git_flow.py` (pe-1) and store the result on the planning context as `${git_flow_resolution}`. The two fields you persist downstream are `base_branch` and `branch_strategy`:
 
    ```bash
-   node --input-type=module -e "
-     import('./hive/lib/git_flow.mjs').then(m => {
-       const r = m.resolveGitFlow({ cwd: process.cwd() });
-       process.stdout.write(JSON.stringify(r));
-     });
-   "
+   printf '%s' '{"cwd":"."}' | python3 hive/lib/git_flow.py
    ```
 
    The resolution is pinned at plan time — even if `hive.config.yaml` drifts later, every downstream sandcastle dispatch for this epic uses the value captured here (see step 15 below). On import failure (helper not vendored), fall back to `{ base_branch: 'main', branch_strategy: 'per-epic' }` and add a one-line note to the design discussion §0 prelude so reviewers know the helper was unavailable.
@@ -250,6 +279,11 @@ run — they are not research and downstream phases depend on them.
 
    This is the consumer side of the audit-trail north-star (north-star 2 in design-discussion §1). /hive:why is the precision query surface; this pre-flight is the planning-skill side that pulls retrospection into design-time.
 
+   **North-star prelude (S6.3).** Also within step 0, check `.pHive/project-profile.yaml` for a `north_star` block (written by `/kickoff` Phase 3b). Two outcomes:
+
+   - **`north_star` block present with at least one core field that is not `unknown`:** add a `NORTH STAR` section to the design-discussion §0 prelude (alongside PRIOR DECISIONS if present). Format as a compact summary listing only fields with non-`unknown` values: `Goal`, `Audience`, `Scale`, `Pain points` — one line each. The design-discussion team reads this as the operator's stated target state and should align proposals to serve it.
+   - **Block absent, all four core fields are `unknown`, file missing, or any read error:** inject nothing. Silent — no placeholder text, no error. Existing projects without `north_star` are unaffected.
+
 1. **Research the codebase.** `SendMessage` to the researcher to explore the target codebase — tech stack, architecture, existing patterns, relevant files. The researcher delivers raw findings (not a formatted brief). Use the researcher agent mindset — you need concrete file paths, not guesses.
 
    The researcher runs **context7 validation always-on** for any library/SDK/API in the requirement. Web research escalation is uncertainty-triggered (stale docs, missing coverage, conflicting info) — not scope-gated. Findings include a validation note with confidence level. If context7 is unavailable, the researcher proceeds codebase-only and notes the gap.
@@ -266,13 +300,31 @@ run — they are not research and downstream phases depend on them.
 
 ### Phase A2: Adversarial Alignment (Grill)
 
-4a. **Run grill against the draft design-discussion.** Invoke the **grill** skill (atomic; `skills/grill/SKILL.md`) — this is an **external call**, NOT inline prose copied from the grill skill. Pass the draft path from step 4 plus the research brief (so grill can read its `inconsistency_risk_signals` field, emitted by the researcher). Grill produces `.pHive/epics/{epic-id}/docs/grill-record.md` per [`hive/references/grill-record-template.md`](../../hive/references/grill-record-template.md).
+4a. **Resolve the grill loop config (s8-grill-configurable-rounds).** Before running grill, call `hive.lib.config.resolve_loop_config('grill')` to read `loops.grill.{enabled, max_rounds}` with the standard precedence (env > root `hive.config.yaml` > shipped baseline). This yields `grill_enabled` and `grill_max_rounds`. Grill is a **skill-level loop owned here in Phase A2** — it does NOT go through the DAG unroll expander (s2); it shares only the `loops.*` config surface. Determine the ceiling:
+
+   - **`grill_enabled=false` (baseline default) OR `grill_max_rounds == 1` → single degenerate pass.** Run grill exactly once (the current, back-compat behavior — byte-identical to pre-s8). Do NOT loop.
+   - **`grill_enabled=true` AND `grill_max_rounds > 1` → bounded multi-round loop** (step 4a-loop below).
+
+4a-loop. **Bounded grill → writer-revise loop.** For each round `k` from 1 up to `grill_max_rounds`:
+
+   1. **Invoke the grill skill** (atomic; `skills/grill/SKILL.md`) — this is an **external call**, NOT inline prose copied from the grill skill. Pass the draft path from step 4, the research brief (so grill can read its `inconsistency_risk_signals` field), and the current `round_number = k`. Grill produces/overwrites `.pHive/epics/{epic-id}/docs/grill-record.md` per [`hive/references/grill-record-template.md`](../../hive/references/grill-record-template.md), whose header carries the machine-readable `unresolved_count` (integer) convergence signal and `round_number`.
+   2. **Early convergence check.** Read `unresolved_count` from the grill-record header. If `unresolved_count == 0` (zero unresolved findings), the draft has converged — **exit the loop immediately** without running further rounds (so round `k+1..max_rounds` do not run). This is the early-convergence stop.
+   3. **Per-round writer-revise.** If `unresolved_count > 0` AND `k < grill_max_rounds`, `SendMessage` the technical writer to **revise the draft against this round's grill-record** before the next round re-grills the revised draft. This writer-revise fires **every round** (per-round, inter-round) — it is independent of the collaborative-review gate in 4b, which fires at most once after the loop.
+
+   The loop is a ceiling: it runs at most `grill_max_rounds` rounds and stops early on convergence. A single pass (`max_rounds=1` or disabled) is the degenerate case of this same structure — one grill call, no inter-round writer-revise.
+
+**Executor (dispatch-to-tpm, else orchestrator-local).** The adversarial pass is owned by the **`tpm`** persona (which carries the grill skill and runs on the fable model — an intentionally distinct model from the technical-writer that authored the draft, so the grill is an independent adversary rather than self-review). Route the invocation:
+
+- **If `tpm` is on the active planning team** (assembled by `planning-classification` for this run — typically medium/large scope), `SendMessage` the grill skill to the `tpm` teammate with the draft path + research brief, mirroring how step 4 dispatches design-discussion to the technical writer. The tpm teammate runs grill and returns the grill-record path.
+- **Else (small-scope runs where `tpm` was not spawned)**, fall back to invoking the grill skill orchestrator-local. The grill-record is still produced; only the executor differs.
+
+Either way the output contract is identical: one grill-record at the path above. The executor choice never changes grill's atomic boundary (below).
 
 The grill-record surfaces five categories of finding (vocabulary mismatches, hidden assumptions, unresolved tensions, convention violations, posture mismatches) — descriptive only, no prescriptions, no quality scoring. Each finding ends with a question for the planner to answer.
 
 If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (silent-on-absence per skill-prelude contract). If the research brief is missing `inconsistency_risk_signals`, grill runs heuristically against the draft alone.
 
-**Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Phase A2 is a single skill invocation that returns a grill-record path; this skill does not duplicate grill's pass.
+**Atomic boundary:** if grill ever appears as inline prose inside this skill, that is a regression. Each round is a single external grill **skill invocation** that returns a grill-record path; this skill orchestrates the rounds (config, ceiling, convergence, writer-revise) but never duplicates grill's adversarial pass inline.
 
 4b. **Collaborative review gate (if enabled).** Check `hive.config.yaml → planning.collaborative_review`. If `true` (default), run the collaborative review gate (see Collaborative Review Gate section below). `SendMessage` the design discussion AND the grill-record from Phase A2 to all active team agents for review. The technical writer revises the draft to address each grill-record finding (or annotates explicitly-accepted-and-justified deviations) and incorporate team feedback. If `false`, skip the review gate; the writer still revises against the grill-record, then the document is presented directly to the user. Also skip if `--lite` is active — `--lite` is equivalent to `planning.collaborative_review = false` for this run only; the writer still revises against the grill-record.
 
@@ -313,72 +365,20 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
    - **Medium** (multi-file, multiple layers, cross-stack): needs H/V planning to slice correctly → Phase B2 (unless `--fast` or `--lite`, both of which skip H/V entirely; `--lite` also skips the review gate and outline)
    - **Large** (multi-system, migration, long-horizon): needs full H/V + structured outline with elicitation → Phase B2 + B3 (`--lite` skips review gates only; H/V and outline are still required at large scope)
 
-### Phase B2: Horizontal + Vertical Planning (medium and large scope)
+   **LSP suggestion (Medium and Large only):** Immediately after announcing the SCALE
+   DECISION, when scope is Medium or Large, check `hive/references/lsp-suggestions.md`
+   for an applicable LSP suggestion. Read `tech_stack` from `.pHive/project-profile.yaml`
+   (tolerant reader handles both flat-list and nested `languages[]` shapes). If a
+   confirmed plugin is detected and not yet enabled in `~/.claude/settings.json`, emit
+   the one-line suggestion from the reference doc. This step is **non-blocking and
+   text-only** — the `LSP` tool is never invoked. Suppress when: scope is Small, the
+   plugin is already enabled, or no confirmed plugin exists for the detected language.
+   Full invariants and suppress-when rules: `hive/references/lsp-suggestions.md` →
+   §Invariants (single source — do not restate here).
 
-6. **TPM plans the delivery.** `SendMessage` to the TPM with the design discussion, user feedback, research brief, and any architect outputs. The TPM:
-   a. Maps all architectural layers and cross-layer dependencies (horizontal thinking)
-   b. Cuts vertical slices — minimum cross-stack increments that each produce a working state
-   c. Directs the technical writer to produce both documents using the horizontal-plan and vertical-plan skills
-
-   The TPM is the owner of this step. The architect (if present) has already contributed their perspective in earlier phases — the TPM now sequences their inputs into an executable delivery plan.
-
-7. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), run the collaborative review gate on the H/V outputs. `SendMessage` both documents to all active team agents. The researcher verifies findings are accurately reflected, the architect (if present) validates technical soundness, and the UI designer (if present) flags any UI layer gaps. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly. Also skip if `--lite` is active (equivalent to `planning.collaborative_review = false` for this run).
-
-8. **H/V gate (conditional).** Behavior depends on scope and flags:
-
-   - **Large scope:** Always present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase B3.
-   - **Medium scope + `--gate-hv`:** Present both documents to the user for review. Collect feedback, incorporate, then proceed to Phase C.
-   - **Medium scope (default, no `--gate-hv`):** Auto-proceed to Phase C without presenting a gate — the collaborative review in step 7 is sufficient.
-   - **Medium scope + `--fast`:** H/V planning was skipped entirely at step 5 — this step is never reached.
-
-   When this gate runs, it is local to the orchestrator even if the H/V docs
-   were produced or revised by CC-Workflows-dispatched or Multica-dispatched
-   planning personas. Workflow tool completion and Multica completion are
-   artifact-readiness signals, not user review approvals.
-
-   **When the gate runs (large or medium + `--gate-hv`), the user reviews:**
-   - Are the layers correctly identified? (horizontal)
-   - Are the slice boundaries logical? (vertical)
-   - Is the first slice thin enough to be a real proof of concept?
-   - Does each slice produce a genuinely working state?
-   - Are deferred items acceptable?
-
-### Phase B3: Structured Outline (large scope only)
-
-9. **Produce structured outline.** `SendMessage` to the technical writer with the `structured-outline` skill (`skills/hive/skills/structured-outline/SKILL.md`, which enforces all mandatory parts and the completeness gate — Risk Registry and Elicitation are not optional). Input: H/V plans + design discussion + user feedback + research brief. Output: a ~1000-line structured outline with detailed approach, file manifest, risk registry, and elicitation questions. The outline now builds ON the vertical slice plan — each phase in the outline maps to a vertical slice.
-
-9b. **Collaborative review gate (if enabled).** If `hive.config.yaml → planning.collaborative_review` is `true` (default), and `--lite` is NOT active, run the collaborative review gate on the structured outline. This is the most critical review — all active team agents review the full outline. The TPM validates sequencing, the researcher confirms technical accuracy, the architect (if present) stress-tests feasibility, and the UI designer (if present) validates UI approach. Collect feedback, have the writer revise if needed. If `false`, skip and proceed directly.
-
-   **UI Designer SCALE_CALL revision (step 9b only) — two-gate precedence rule:** If ui-designer emits a `SCALE_CALL` field in their step 9b review response, apply **last gate wins**:
-   - **Revised to `pre-exec`:** delete any existing ui-designer escalation entry in cycle state, then write the step 9b `ESCALATION:` block as a fresh entry. Log: `"ui-designer scale call revised at step 9b to pre-exec — writing fresh escalation"`
-   - **Revised to `in-planning`:** delete any existing ui-designer escalation entry in cycle state (step 4b pre-exec call is superseded). Log: `"ui-designer scale call revised at step 9b to in-planning — escalation removed"`
-   - **No step 9b revision:** step 4b value stands unchanged; no action needed
-
-10. **Present structured outline to user.** Show the full document, including a summary of team review findings. The elicitation section (Part 7) contains the agent team's own stress-test of the plan — the user reads the team's answers to evaluate whether the thinking is sound. The user then:
-    - Flags any elicitation answers that seem weak or wrong
-    - Responds to the decision points (Part 8) — numbered affirm/change items
-    - Provides final sign-off or requests revisions
-
-    This sign-off gate is always local to the orchestrator, including when the
-    structured outline was produced by CC-Workflows-dispatched or
-    Multica-dispatched planning personas. Do not let Workflow tool completion,
-    Multica issue completion, or episode markers imply sign-off.
-
-    Incorporate feedback into the planning context before proceeding.
-
-    **S2.1 seam 3 — waiting-on-user `phase_blocked` emission.** Before presenting the document and pausing for input, emit one `phase_blocked` triple keyed to this gate. The emit is fire-and-forget (CLI swallows knob==off + missing-sqlite; do NOT branch on its exit code):
-
-    ```bash
-    python3 -m hive.lib.kg_emit_cli \
-      --subject "{epic_id}" \
-      --predicate "phase_blocked" \
-      --object "waiting-user-input-structured-outline-sign-off" \
-      --source-epic "{epic_id}" \
-      --source-agent "orchestrator"
-    ```
-
-    Apply the same pattern at the two other waiting-on-user pauses in /plan: design-discussion review (Phase B) gate uses `--object "waiting-user-input-design-discussion"`, and H/V plan review gate uses `--object "waiting-user-input-hv-plan-review"`. Gate-name slugs are kebab-stable so /meta-optimize can group by gate. Add no new error handling — the CLI is silent on failure by design.
-
+### Phase B2/B3: Horizontal + Vertical Planning, Structured Outline
+- Medium/Large scope: Read `references/horizontal-vertical-planning.md` and follow it — steps 6-8 (TPM delivery plan, collaborative review gate, H/V gate).
+- Large scope only: Read `references/structured-outline-phase.md` and follow it — steps 9-10 (structured outline, collaborative review gate, user sign-off gate).
 ### Phase C: Story Decomposition
 
 10c. **Resolve methodology.** Before decomposing stories, determine the development methodology with strict 4-tier precedence:
@@ -647,17 +647,30 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
        The `implement` step's `depends_on` must be updated to reference `scenario` (BDD/TDD) or the `test` step must reference `scenario` (classic) so execution order is preserved.
 
-    3. **Seed `manual_verdict.scenario_ref`** on the story YAML as a placeholder:
+    3. **Seed `manual_verdict.scenario_ref` and `required`** on the story YAML as a placeholder:
 
        ```yaml
        manual_verdict:
          scenario_ref: .pHive/test-scenarios/<story-id>-manual.yaml
+         required: true | false   # plan-derived — see below; NOT an operator prompt
          verdict: null       # written by /test --simulated-manual at execution time
          timestamp: null
          agent: null
        ```
 
        The tester who executes the `scenario` step replaces the placeholder path with the real scenario file they author.
+
+       **Deriving `required`** (story wr-3-manual-verdict-aging, REVISION-1b): "required device-pass" is
+       not derivable from any other field — the `simulated-manual` concern applies to non-UI stories too,
+       and no separate device/UI tier field exists in the schema (see
+       [`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md) §9.1b). Set `required: true`
+       only when the story you are evaluating is itself a genuine UI/device-pass gate — i.e. the concern
+       applied because the story changes user-facing UI/interaction behavior that a real device or manual
+       pass is needed to validate (e.g. a new screen, a gesture flow, a rendering change). Set
+       `required: false` for every other story where the concern merely applies for scenario-replay
+       coverage but no device/UI validation gate is warranted (e.g. a backend story that happens to also
+       carry a simulated-manual scenario for regression coverage). This is a plan-time judgment call by the
+       planning persona — do not ask the operator, and do not leave it for `/ship` to infer.
 
     4. The concern's `implementation_checklist` flows through to execute via the generic concern-loop — its bullets reach the developer/reviewer alongside other concerns.
 
@@ -669,11 +682,28 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     Stories that fail the gate are flagged in the step 18 confirmation output alongside `agent-ready-checklist` failures; the user can approve with known gaps or ask to fix them before proceeding.
 
-14b. **Capture release intent.** Ask the user exactly:
+14b. **Capture release intent.** Ask the user exactly (headless: phase `14b-version-bump` — see Headless Mode above):
 
     > Does this epic bump the version? major | minor | patch | none
 
     Store the answer on the planning context as `${version_bump}`. The value MUST be exactly one of `major`, `minor`, `patch`, or `none`; if the answer is missing or ambiguous, ask once for clarification before writing `epic.yaml`. If the clarification answer is STILL not exactly one of the four literals, default `${version_bump}` to `none`, record `version_bump_defaulted: true` on the planning context and in `epic.yaml`, and surface a user-facing warning: `version_bump answer not recognized — defaulted to none; re-run /plan or edit epic.yaml to change.` Only those four literal values may be written to `epic.yaml`. Use `none` when the user explicitly selects it, when a re-plan preserves an existing `version_bump: none`, or via this default-on-invalid path.
+
+14c. **Capture sidecar retention intent.** Ask the user exactly:
+
+    > Retain planning sidecars? committed | transient | commit-docs-only
+
+    **Resolution precedence (first match wins):**
+
+    1. User's answer to this question (per-epic override).
+    2. `planning.sidecar_retention` in root-resolved `hive.config.yaml`.
+    3. Shipped default: `committed`.
+
+    The value MUST be exactly one of `committed`, `transient`, or `commit-docs-only`. If the answer is missing, unrecognized, or the user skips, fall through to the config key, then the default. Store the resolved value on the planning context as `${sidecar_retention}`.
+
+    **Solo vs group guidance** (shown to user when they skip or are unsure):
+    - Solo project → `transient` (generated HTML is clutter; re-run to regenerate)
+    - Group / shared project → `committed` (committed sidecars make the plan easy to share without a re-run)
+    - Docs-heavy project wanting to commit story docs but skip the index → `commit-docs-only`
 
 15. **Write the epic index.** Produce `.pHive/epics/{epic-id}/epic.yaml` as a lightweight index referencing the stories. The emitted YAML MUST include `version_bump: <major|minor|patch|none>` populated from `${version_bump}`, plus the `git_flow:` block populated from the `${git_flow_resolution}` value captured in Phase A step 0a (pe-5):
 
@@ -683,6 +713,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     target_codebase: <abs path>
     methodology: <classic|tdd|bdd>
     version_bump: <major|minor|patch|none>
+    sidecar_retention: <committed|transient|commit-docs-only>
 
     git_flow:
       base_branch: <resolved>          # from Phase A 0a — `develop` if origin/develop existed at plan time, else `main`, else the explicit override
@@ -711,8 +742,37 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       - if it does not, insert a fresh `git_flow:` block immediately after `version_bump:`;
       - if it already has a `planning_team:` block, overwrite it with the current classification output (do NOT duplicate the block);
       - if it does not, insert a fresh `planning_team:` block immediately after `git_flow:`;
-      - canonical field order owned by /plan is `methodology` → `version_bump` → `git_flow` → `planning_team`; insert to preserve that order.
+      - if it already has a `sidecar_retention:` field, update that field in place from `${sidecar_retention}`;
+      - if it does not, insert `sidecar_retention:` immediately after `version_bump:`;
+      - canonical field order owned by /plan is `methodology` → `version_bump` → `sidecar_retention` → `git_flow` → `planning_team`; insert to preserve that order.
       - all other fields not owned by /plan (e.g. `source_issue`, `description`, free-form notes) are preserved untouched.
+
+    **`.gitignore` policy — drive from `${sidecar_retention}`** immediately after writing `epic.yaml`. The epic docs dir is `.pHive/epics/{epic-id}/docs/`. Locate the `.gitignore` in the repo root and apply the matching block:
+
+    - `committed`: Ensure the epic dir is un-ignored. Append (or confirm already present):
+      ```gitignore
+      !.pHive/epics/{epic-id}/
+      !.pHive/epics/{epic-id}/**
+      ```
+      The existing `.pHive/epics/*` pattern already re-ignores children; these two negations allowlist the full epic subtree (HTML sidecars, index.html, PNGs, and all docs). If the epic's block already exists, skip (idempotent).
+
+    - `transient`: Do NOT add an epic allowlist block. The existing `.pHive/epics/*` re-ignore covers the epic dir. If an epic allowlist block for this epic already exists (from a previous `committed` run), remove it and append instead:
+      ```gitignore
+      # sidecar_retention=transient: HTML sidecars regenerated on demand
+      .pHive/epics/{epic-id}/docs/*.html
+      .pHive/epics/{epic-id}/index.html
+      ```
+
+    - `commit-docs-only`: Allowlist story doc sidecars but exclude `index.html` and PNGs. Append (or confirm):
+      ```gitignore
+      !.pHive/epics/{epic-id}/
+      !.pHive/epics/{epic-id}/**
+      # sidecar_retention=commit-docs-only: exclude index and illustrations
+      .pHive/epics/{epic-id}/index.html
+      .pHive/epics/{epic-id}/docs/*.png
+      ```
+
+    After applying the policy, surface a one-line confirmation to the user: `sidecar_retention: <value> — .gitignore updated for epic {epic-id}.`
 
     Schema reference: `hive/references/story-yaml-schema.md` §6 "Epic index (`epic.yaml`)" documents the canonical block shape.
 
@@ -726,7 +786,7 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
 
     1. **Build the prompt** from the finalized planning context: epic title + the design-discussion goal + the resolved scale assessment + the principal slices/changes (from H/V or the story list). Ask for a conceptual scene or diagram of the change — not a literal UI screenshot. Keep it one paragraph.
     2. **Invoke** the `openai-image` MCP tool `generate_image` with that prompt, `output_dir` = `.pHive/epics/{epic-id}/docs`, and `output_prefix: concept`. The tool writes `concept-illustration.png` (n=1, opaque). It requires `OPENAI_API_KEY`; `gpt-image-2` may return `403` without a verified OpenAI org.
-    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `lib/html-sidecar-gen`:
+    3. **Embed** a trailing section on the design-discussion (the always-present primary artifact) and regenerate its `.html` sidecar via `python -m hive.lib.html_sidecar_gen`:
 
        ```html
        <figure data-src="concept-illustration.png" data-alt="Concept illustration of the planned change">
@@ -760,6 +820,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
     ````
     ```mermaid
     graph LR
+      accTitle: Story dependency graph
+      accDescr: Dependency edges and parallel-eligibility markers across the epic's stories
       cache-layer --> api-integration
       cache-layer --> event-detail["event-detail ‖ variation"]
       cache-layer --> mobile-detail["mobile-detail ‖ variation"]
@@ -769,6 +831,8 @@ If `.pHive/CONTEXT.md` is absent, grill still runs but with reduced fidelity (si
       mobile-detail --> e2e-tests
     ```
     ````
+
+    **Legend.** `A --> B` means B depends on A. `‖` marks a parallel-eligible story ("parallel to its peers"); its rationale is one of `variation` | `read-only` | `bounded-slice`. Serial stories render as plain node IDs. These conventions are defined once in [`hive/references/planning-format-contract.md`](../../hive/references/planning-format-contract.md) §3.
 
     In the example above, `event-detail` and `mobile-detail` are `variation` siblings of the same refactor template, `audit-token-budgets` is a standalone `read-only` story with no dependents, and the remaining nodes are serial.
 
@@ -1127,13 +1191,7 @@ stories:
 
 ## Diagram Format
 
-All diagrams in Hive output (dependency graphs, flow diagrams) use **Mermaid** syntax. Mermaid renders natively in GitHub, Linear, and most markdown viewers.
-
-- Use `graph LR` (left-to-right) for dependency graphs
-- Use `graph TD` (top-down) for hierarchical or flow diagrams
-- Arrow syntax: `story-a --> story-b` means story-b depends on story-a
-- Keep node IDs matching story IDs for consistency
-- For parallel-eligible stories (those that emit `parallel_allowed: true` in step 13), annotate the node label as `story-id["story-id ‖ <rationale>"]` where `<rationale>` is the bounded enum value (`variation` | `read-only` | `bounded-slice`). The `‖` glyph signals "parallel to its peers." Serial stories render with plain node IDs.
+Mermaid graph conventions — orientation, edge semantics, the `accTitle`/`accDescr` title, and the `‖` parallel-marker legend — are defined once in [`hive/references/planning-format-contract.md`](../../hive/references/planning-format-contract.md) §3, the single source for diagram formatting. Follow §3 for every diagram this skill emits; the dependency-graph example at step 18 shows the convention applied.
 
 ## Planning Document Paths
 
@@ -1209,7 +1267,7 @@ additional error handling.
 - `hive/references/agent-ready-checklist.md` — 9-point story validation
 - `hive/references/cross-cutting-concerns.md` — per-project concern evaluation
 - `hive/references/wireframe-protocol.md` — UI wireframe approval touchpoints
-- `hive/references/agent-teams-guide.md` — TeamCreate mechanics and coordination patterns
+- `hive/references/agent-teams-guide.md` — Agent(name:) teammate mechanics and coordination patterns
 - `hive/agents/researcher.md` — raw data gathering (core team)
 - `hive/agents/technical-writer.md` — document production (core team)
 - `hive/agents/tpm.md` — delivery sequencing (core team)

@@ -19,12 +19,17 @@ spy that records the exact invocation shape (asserted by
 from __future__ import annotations
 
 import json
+import os
+import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from ..errors import AgentHandlerError
+from ..errors import AgentHandlerError, FatalAgentHandlerError
+from hive.lib.skill_binding import SkillBindingError, build_skill_injection, resolve_skill_binding
+from hive.lib.observe_contract import validate_observe_output
 
 
 # Spawn-supplied metadata keys (commit/task bookkeeping derived from the agent's
@@ -45,6 +50,23 @@ _SPAWN_METADATA_OUTPUTS = frozenset(
 )
 
 
+def _story_spec_is_empty(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    if isinstance(value, (dict, list, tuple, set)):
+        return not value
+    return False
+
+# A Multica task can become terminal just before its worktree flush completes.
+# Re-read that SAME worktree on a short bounded schedule before spending a new
+# dispatch attempt (which would create a different worktree and can strand the
+# late outputs). The first pass is immediate; total wait is 7.75 seconds.
+_REHARVEST_DELAYS_S = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+_REMOTE_LOOKUP_DELAYS_S = (0.0, 0.25, 0.5, 1.0, 2.0, 4.0)
+
+
 def _output_is_empty(value: Any) -> bool:
     """True when a harvested output carries no real value (None / empty
     string / empty collection). ``False`` (a real bool) is NOT empty."""
@@ -55,6 +77,34 @@ def _output_is_empty(value: Any) -> bool:
     if isinstance(value, (list, tuple, dict, set)):
         return len(value) == 0
     return False
+
+
+# s3-persist-review-findings: the reviewer's REAL findings live in a stable
+# report file, not just the terse ``review_findings`` scalar in outputs.yaml.
+# A path-only or blank scalar previously satisfied output completeness even
+# when the report it named was empty (#observed on E1 s2 r3) — a blocked
+# story then had no auditable findings surface. The report is validated
+# content, not merely a truthy path string.
+_REVIEW_REPORT_GLOB = "**/.pHive/dag-outputs/review-report.md"
+
+
+def _is_valid_review_report(text: str) -> bool:
+    """Minimal structural check: non-blank, and names a verdict and the
+    reviewed SHA so a blocked story has something auditable to read."""
+    if not text or not text.strip():
+        return False
+    line_prefix = r"(?im)^\s*(?:[-*]\s+)?(?:#{1,6}\s+)?"
+    verdict_key = re.search(
+        line_prefix + r"(?:\*\*)?verdict(?:(?:\*\*)?\s*:|:\s*(?:\*\*)?)",
+        text,
+    )
+    sha_key = re.search(
+        line_prefix
+        + r"(?:\*\*)?(?:(?:reviewed|commit)\s+)?sha"
+        + r"(?:(?:\*\*)?\s*:|:\s*(?:\*\*)?)",
+        text,
+    )
+    return verdict_key is not None and sha_key is not None
 
 
 def _output_contract_preamble(output_names: list[str]) -> str:
@@ -82,6 +132,111 @@ def _output_contract_preamble(output_names: list[str]) -> str:
         "until it exists with every key.\n\n"
         "---\n\n"
     )
+
+
+def _output_contract_closer(output_names: list[str]) -> str:
+    """A terminal restatement of the #13 output contract, appended as the LAST
+    thing in a Multica node's brief.
+
+    The prepended preamble alone left a gap: an agent reads it up front, works a
+    long task, and ends its turn without writing ``outputs.yaml`` — the write was
+    most due exactly when the instruction was least fresh (observed on the test
+    node, which ran dev-supplied passing tests and stopped without emitting
+    ``test_results``/``test_artifacts``). Restating the obligation at the stop
+    boundary closes that gap; it is cheap, additive, and applies to every node
+    that declares semantic outputs.
+    """
+    keys = ", ".join(f"`{n}`" for n in output_names)
+    return (
+        "\n\n---\n\n"
+        "## ⛔ STOP GATE (#13 — DO THIS LAST, BEFORE YOU END YOUR TURN)\n\n"
+        f"Your turn is NOT complete until `.pHive/dag-outputs/outputs.yaml` exists "
+        f"in your work_dir with EVERY key: {keys}. Writing your work report or "
+        "committing code is NOT a substitute. Self-check now: does that file exist "
+        "with every key set to a real value (not a placeholder)? If not, write it "
+        "and only then stop. A missing or partial file means your work is "
+        "DISCARDED and the node fails.\n"
+    )
+
+
+def _rlm_opt_in(node: Any) -> bool:
+    """The a-rlm-recursive-node opt-in gate — a MINIMAL, dependency-free check on
+    ``node.config.rlm`` so the flag-OFF path decides WITHOUT importing rlm.py
+    (codex finding 2).
+
+    Activation (codex finding 3 — no truthiness footgun):
+      * scalar ``rlm: true``  -> ON
+      * block  ``rlm: {enabled: true, ...}`` -> ON (explicit ``enabled: true``)
+      * ``rlm: false`` / ``rlm: {}`` / ``rlm: {enabled: false}`` / absent /
+        non-dict config -> OFF
+
+    An empty ``rlm: {}`` block therefore does NOT activate: the dict form REQUIRES
+    an explicit ``enabled: true``.
+    """
+    config = getattr(node, "config", None)
+    if not isinstance(config, dict):
+        return False
+    rlm = config.get("rlm")
+    if isinstance(rlm, dict):
+        return rlm.get("enabled") is True
+    return bool(rlm)
+
+
+def _skill_binding_config(node: Any) -> list[dict[str, Any]] | None:
+    """``node.config.skill_binding`` opt-in — mirrors ``_rlm_opt_in``'s shape.
+
+    A single ``{persona_path, trigger, require?, in_graph?}`` mapping OR a
+    LIST of them (a node may need more than one skill actually invoked — e.g.
+    the reviewer node invokes both ``skills/review/SKILL.md`` and
+    ``skills/verify/SKILL.md``). Always normalised to a list. Absent (None)
+    on every node in every existing workflow, so it is a no-op for everything
+    except nodes that explicitly opt in.
+
+    Present-but-malformed FAILS CLOSED — a misspelled/incomplete opt-in that
+    is indistinguishable from "no binding" is exactly how an authority
+    requirement gets skipped unnoticed. Only true absence opts out.
+    """
+    config = getattr(node, "config", None)
+    if not isinstance(config, dict):
+        return None
+    if "skill_binding" not in config:
+        return None  # truly absent — the only valid opt-out
+    raw = config.get("skill_binding")
+    items = raw if isinstance(raw, list) else [raw]
+    if not items:
+        raise AgentHandlerError(
+            f"node {getattr(node, 'id', '?')!r}: skill_binding is empty"
+        )
+    for binding in items:
+        if not isinstance(binding, dict):
+            raise AgentHandlerError(
+                f"node {getattr(node, 'id', '?')!r}: skill_binding must be a mapping "
+                f"(or list of mappings), got {type(binding).__name__}"
+            )
+        missing = [k for k in ("persona_path", "trigger") if not binding.get(k)]
+        if missing:
+            raise AgentHandlerError(
+                f"node {getattr(node, 'id', '?')!r}: skill_binding missing required "
+                f"field(s) {missing!r}"
+            )
+    return items
+
+
+def _observe_contract_enabled(node: Any, resolved_skills: list[Any]) -> bool:
+    """Return whether advisor/observe output must be enforced.
+
+    A resolved observe binding is itself the runtime authority marker, so it
+    enables the contract automatically. The explicit config flag remains as
+    a compatibility opt-in for callers without a skill binding.
+    """
+    config = getattr(node, "config", None)
+    if isinstance(config, dict) and bool(config.get("observe_contract")):
+        return True
+    for skill in resolved_skills:
+        parts = Path(str(getattr(skill, "skill_path", ""))).parts
+        if tuple(parts[-3:]) == ("skills", "observe", "SKILL.md"):
+            return True
+    return False
 
 
 @dataclass
@@ -122,6 +277,16 @@ class StubAgentSpawn:
 
     Returns canned outputs keyed by `step_id`. Records every invocation
     in `self.calls` so unit tests can spy on the call shape.
+
+    Loop-aware lookup: the static unroll expander rewrites a looped body
+    node ``X`` into round copies ``X__r1 … X__rN``.  A real agent produces
+    its declared outputs on every round regardless of the round-copy id, so
+    the stub must too.  Lookup therefore tries the exact ``step_id`` first
+    (letting convergence fixtures supply *per-round* outputs keyed by
+    ``X__rk``) and, only on a miss, falls back to the declared id with the
+    ``__r<k>`` suffix stripped (letting declared-id-keyed fixtures feed every
+    round of a loop).  This keeps round copies transparent to the agent layer
+    exactly as the retired runtime LOOP node was.
     """
 
     def __init__(self, canned_outputs: dict[str, dict[str, Any]] | None = None):
@@ -145,7 +310,12 @@ class StubAgentSpawn:
                 "step_id": step_id,
             }
         )
-        return dict(self.canned_outputs.get(step_id, {}))
+        if step_id in self.canned_outputs:
+            return dict(self.canned_outputs[step_id])
+        # Round-copy fallback: strip a trailing ``__r<k>`` and retry under the
+        # declared body-node id.
+        declared_id = re.sub(r"__r\d+$", "", step_id)
+        return dict(self.canned_outputs.get(declared_id, {}))
 
 
 class LocalAgentSpawn:
@@ -341,7 +511,17 @@ class MulticaAgentSpawn:
         tracker_id = self._resolve_tracker_id(
             run_id, step_id, agent, step_file_content, inputs
         )
-        self._dispatch(tracker_id, agent)
+        story_id = inputs.get("story_id")
+        # Rebuild the brief and send it on dispatch too, so a reused/deduped/
+        # cached issue is refreshed with the CURRENT brief (incl. any injected
+        # skill) instead of running the body it was first created with.
+        brief_body = self._build_brief_body(run_id, step_id, step_file_content, inputs)
+        self._dispatch(
+            tracker_id,
+            agent,
+            story_id=story_id if isinstance(story_id, str) and story_id else None,
+            body=brief_body,
+        )
         terminal = self._poll(tracker_id)
         status = terminal.get("status", "")
         if status != "completed":
@@ -362,13 +542,10 @@ class MulticaAgentSpawn:
             "agent_id": terminal.get("agent_id"),
             "tracker_id": tracker_id,
         }
-        # #7: Multica's task API does NOT report the agent's commit/push, so the
-        # poll terminal carries no code_push_sha/branch/repo — leaving the
-        # reconcile node with nothing to ff-merge (the committed epic never
-        # reaches the gate's repo_root). Derive the real commit metadata from
-        # the git HEAD of the agent's isolated work_dir checkout, and point
-        # reconcile at that local checkout as the fetch source (no dependency on
-        # the agent having pushed to a remote).
+        # #7 / Fix 6: Multica's task API does not report the pushed commit. For
+        # integration runs, resolve the shared branch from the executor's
+        # origin; daemon-local refs are reused and can be stale. Runs without an
+        # integration target retain the local-checkout fallback.
         for key, value in self._harvest_git_state(terminal.get("work_dir")).items():
             if value is not None:
                 outputs[key] = value
@@ -380,6 +557,11 @@ class MulticaAgentSpawn:
         # This supersedes the plan-specific docs harvest below for any node that
         # writes the file; the docs harvest stays as a fallback.
         for key, value in self._harvest_node_outputs(terminal.get("work_dir")).items():
+            outputs[key] = value
+        # s3-persist-review-findings: the validated review report, when
+        # present, is authoritative over whatever outputs.yaml declared for
+        # review_findings (see _harvest_review_report docstring).
+        for key, value in self._harvest_review_report(terminal.get("work_dir")).items():
             outputs[key] = value
         # Surface the agent's committed planning artifacts as named outputs so
         # downstream nodes can consume them in-memory. Multica agents deliver
@@ -413,6 +595,8 @@ class MulticaAgentSpawn:
             if value is not None:
                 outputs[key] = value
         for key, value in self._harvest_node_outputs(work_dir).items():
+            outputs[key] = value
+        for key, value in self._harvest_review_report(work_dir).items():
             outputs[key] = value
         for key, value in self._harvest_artifacts(work_dir).items():
             outputs.setdefault(key, value)
@@ -589,6 +773,44 @@ class MulticaAgentSpawn:
         return out
 
     @staticmethod
+    def _harvest_review_report(work_dir: str | None) -> dict[str, Any]:
+        """Dereference the reviewer's ``review-report.md`` into
+        ``review_findings`` (s3-persist-review-findings).
+
+        The reviewer contract requires this stable report file — living
+        alongside ``outputs.yaml`` in the same ephemeral, gitignored
+        ``.pHive/dag-outputs/`` scratch dir — on every review round, in
+        addition to the terse ``review_findings`` scalar. When present, its
+        VALIDATED content is authoritative for ``review_findings`` and
+        overrides whatever ``_harvest_node_outputs`` already merged (a bare
+        path string or a stale scalar). A missing, blank, or structurally
+        invalid report is surfaced as an explicit empty string rather than
+        silently keeping a truthy placeholder — this feeds the same #13
+        under-run detection used for every other declared output, so a
+        not-yet-flushed report is retried through the existing bounded
+        reharvest/backoff path (#22/Fix 4) instead of passing as complete.
+
+        No-op (``{}``) when no report file exists — non-review nodes, and
+        any work_dir this glob does not match, are unaffected.
+        """
+        out: dict[str, Any] = {}
+        if not work_dir:
+            return out
+        wd = Path(work_dir)
+        try:
+            candidates = sorted(wd.glob(_REVIEW_REPORT_GLOB))
+        except OSError:
+            return out
+        if not candidates:
+            return out
+        try:
+            text = candidates[0].read_text(encoding="utf-8")
+        except OSError:
+            return out
+        out["review_findings"] = text if _is_valid_review_report(text) else ""
+        return out
+
+    @staticmethod
     def _harvest_artifacts(work_dir: str | None) -> dict[str, Any]:
         """Read the planning artifacts the agent committed in its work_dir and
         surface them as named outputs (file-stored, passed in-memory).
@@ -662,27 +884,33 @@ class MulticaAgentSpawn:
                 )
         return out
 
-    @staticmethod
-    def _harvest_git_state(work_dir: str | None) -> dict[str, Any]:
-        """Derive the agent's commit metadata from the git HEAD of its work_dir
-        checkout (#7).
+    def _harvest_git_state(self, work_dir: str | None) -> dict[str, Any]:
+        """Derive the agent's commit metadata from its work_dir checkout (#7).
 
         Multica's task API does not report what the agent committed/pushed, so
         the poll terminal has no sha/branch/repo. The agent's isolated work_dir
-        IS a real git checkout sitting on the branch + commit it produced, so we
-        read it directly:
+        IS a real git checkout, so we read it directly.
 
-        - ``code_push_sha`` / ``commit_sha`` <- ``git rev-parse HEAD``
-        - ``branch`` <- ``git rev-parse --abbrev-ref HEAD``
-        - ``repo`` / ``work_dir`` <- the checkout path, so the reconcile node
-          fetches the branch from this LOCAL checkout (no remote-push
-          dependency; reconcileBranch accepts a local repo path).
+        Ref selection (Fix 6): Multica reuses daemon workspaces. Their local
+        ``feat/<epic>`` ref can stay pinned to an old, even divergent commit while
+        agents push fresh work to ``origin/feat/<epic>``. Therefore an integration
+        run resolves the branch from the EXECUTOR checkout's authoritative
+        ``origin`` and makes reconcile fetch that same source. A daemon-local HEAD
+        remains only the fallback for runs with no integration target.
 
-        Best-effort: returns ``{}`` if no checkout/git is found so it never
-        masks a real task result.
+        - ``code_push_sha`` / ``commit_sha`` <- the chosen ref's tip
+        - ``branch`` <- the chosen ref's name, except daemon-owned ``agent/*``
+          refs, which are suppressed so reconcile can mint a SHA-derived ref
+        - ``repo`` <- ``origin`` for an integration-branch SHA, otherwise the
+          checkout path for the local-ref fallback
+        - ``work_dir`` <- the agent checkout path for semantic/artifact harvest
+
+        Returns ``{}`` if no checkout/git is found. Once an integration target
+        exists, failure to resolve its authoritative remote ref is fatal rather
+        than silently falling back to a known-stale daemon branch.
         """
         out: dict[str, Any] = {}
-        repo_dir = MulticaAgentSpawn._find_repo_checkout(work_dir)
+        repo_dir = self._find_repo_checkout(work_dir)
         if repo_dir is None:
             return out
 
@@ -700,14 +928,44 @@ class MulticaAgentSpawn:
                 return None
             return result.stdout.strip() or None
 
-        sha = _git("rev-parse", "HEAD")
-        branch = _git("rev-parse", "--abbrev-ref", "HEAD")
-        if sha:
-            out["code_push_sha"] = sha
-            out["commit_sha"] = sha
-        if branch and branch != "HEAD":
-            out["branch"] = branch
-        out["repo"] = str(repo_dir)
+        head_sha = _git("rev-parse", "HEAD")
+        head_branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+
+        target = self._target_branch()
+        local_target_sha = (
+            _git("rev-parse", "--verify", "--quiet", target) if target else None
+        )
+        remote_commit_sha = (
+            self._remote_target_commit(target, (head_sha, local_target_sha))
+            if target
+            else None
+        )
+        if target and not remote_commit_sha:
+            raise AgentHandlerError(
+                f"could not verify the task commit on authoritative remote ref "
+                f"origin/{target!s} while harvesting Multica work_dir {repo_dir}"
+            )
+
+        chosen_sha = head_sha
+        chosen_branch = head_branch
+        source_repo = str(repo_dir)
+        # The remote integration ref is ALWAYS authoritative for integration
+        # runs, including when it already equals executor HEAD. Falling through
+        # in that equality case would re-enable the stale daemon-local target
+        # arbitration on the very next no-op/review node.
+        if target and remote_commit_sha:
+            chosen_sha, chosen_branch = remote_commit_sha, target
+            source_repo = "origin"
+        if chosen_sha:
+            out["code_push_sha"] = chosen_sha
+            out["commit_sha"] = chosen_sha
+        if (
+            chosen_branch
+            and chosen_branch != "HEAD"
+            and not chosen_branch.startswith("agent/")
+        ):
+            out["branch"] = chosen_branch
+        out["repo"] = source_repo
         out["work_dir"] = str(repo_dir)
         return out
 
@@ -725,17 +983,19 @@ class MulticaAgentSpawn:
             / "tracker.json"
         )
 
-    def _branch_contract(self) -> str:
-        """Brief preamble telling the agent to base its work on the executor's
-        target branch (#15), when ``repo_root`` is on a non-default (epic)
-        branch. Empty on the default branch (e.g. plan, which creates its own
-        epic branch) — preserving that flow. Best-effort: returns "" if git
-        can't resolve the branch.
+    def _target_branch(self) -> str:
+        """The executor's epic/integration branch — ``repo_root``'s current
+        branch when it is a NON-default branch. Returns "" on the default branch
+        (e.g. plan, which creates its own epic branch), when no origin default
+        resolves, or for a non-git ``repo_root`` (unit tests / local binding) —
+        preserving those flows.
+
+        This is both the branch the Repo branch contract tells agents to commit
+        to AND the branch the harvest treats as authoritative for the agent's
+        commit (a drifted HEAD on the daemon's auto-branch must not strand it).
+        Best-effort: returns "" if git can't resolve the branch.
         """
         if self._repo_root is None or not (self._repo_root / ".git").exists():
-            # No git checkout (e.g. unit tests with a plain tmp repo_root) — skip
-            # entirely so we don't issue subprocess calls a test's mock expects
-            # to be cli.mjs invocations.
             return ""
 
         def _git(*args: str) -> str | None:
@@ -769,6 +1029,113 @@ class MulticaAgentSpawn:
             return ""
         if branch == default:
             return ""  # default branch — no epic-branch directive
+        return branch
+
+    def _remote_target_commit(
+        self, branch: str, local_candidates: tuple[str | None, ...]
+    ) -> str | None:
+        """Return this task's commit once ``origin/<branch>`` contains it.
+
+        Both daemon HEAD and its local integration ref are candidate sources:
+        Multica topologies have left either one at base after committing on the
+        other. Candidates already contained by executor HEAD are stale/no-op and
+        discarded. We then poll through the terminal-before-push race, fetch the
+        exact remote ref without updating tracking refs, and prove a remaining
+        candidate is reachable from a stable advertised remote tip. Returning
+        that candidate (not a possibly-later tip) preserves task provenance.
+        """
+        if not branch or self._repo_root is None:
+            return None
+        def _run(*args: str) -> subprocess.CompletedProcess[str] | None:
+            try:
+                return subprocess.run(
+                    ["git", "-C", str(self._repo_root), *args],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+            except (OSError, subprocess.SubprocessError):
+                return None
+
+        executor_head = _run("rev-parse", "HEAD")
+        if executor_head is None or executor_head.returncode != 0:
+            return None
+        executor_sha = executor_head.stdout.strip()
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", executor_sha):
+            return None
+
+        candidates: list[str] = []
+        for raw in local_candidates:
+            candidate = raw or ""
+            if not re.fullmatch(r"[0-9a-fA-F]{40}", candidate):
+                continue
+            candidate = candidate.lower()
+            if candidate in candidates:
+                continue
+            contained = _run("merge-base", "--is-ancestor", candidate, executor_sha)
+            if contained is None or contained.returncode != 0:
+                candidates.append(candidate)
+        if not candidates:
+            candidates.append(executor_sha.lower())
+
+        ref = f"refs/heads/{branch}"
+        for delay_s in _REMOTE_LOOKUP_DELAYS_S:
+            if delay_s:
+                time.sleep(delay_s)
+            result = _run("ls-remote", "--exit-code", "origin", ref)
+            if result is None or result.returncode != 0:
+                continue
+            remote_sha = ""
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    remote_sha = parts[0].lower()
+                    break
+            if not re.fullmatch(r"[0-9a-f]{40}", remote_sha):
+                continue
+            fetched = _run(
+                "fetch", "--quiet", "--no-tags", "--no-write-fetch-head", "origin", ref
+            )
+            if fetched is None or fetched.returncode != 0:
+                continue
+            confirmed = _run("ls-remote", "--exit-code", "origin", ref)
+            if confirmed is None or confirmed.returncode != 0:
+                continue
+            confirmed_parts = confirmed.stdout.split()
+            if len(confirmed_parts) != 2 or confirmed_parts[0].lower() != remote_sha:
+                continue
+            reachable_candidates: list[str] = []
+            for candidate in candidates:
+                reachable = _run("merge-base", "--is-ancestor", candidate, remote_sha)
+                if reachable and reachable.returncode == 0:
+                    reachable_candidates.append(candidate)
+            # If both local refs are reachable, prefer the newer one in their
+            # ancestry chain rather than whichever ref happened to be listed
+            # first. This handles HEAD-at-base / target-at-task and its inverse.
+            for candidate in reachable_candidates:
+                has_reachable_descendant = False
+                for other in reachable_candidates:
+                    if other == candidate:
+                        continue
+                    older = _run("merge-base", "--is-ancestor", candidate, other)
+                    if older and older.returncode == 0:
+                        has_reachable_descendant = True
+                        break
+                if has_reachable_descendant:
+                    continue
+                return candidate
+        return None
+
+    def _branch_contract(self) -> str:
+        """Brief preamble telling the agent to base its work on the executor's
+        target branch (#15), when ``repo_root`` is on a non-default (epic)
+        branch. Empty on the default branch (e.g. plan, which creates its own
+        epic branch) — preserving that flow. Best-effort: returns "" if git
+        can't resolve the branch.
+        """
+        branch = self._target_branch()
+        if not branch:
+            return ""
         return (
             "## Repo branch contract — FIRST ACTION (overrides the daemon's auto-checkout)\n\n"
             f"The DAG executor reconciles your commit FROM the `{branch}` branch (the epic "
@@ -776,11 +1143,44 @@ class MulticaAgentSpawn:
             f"move to `{branch}` before doing any work:\n\n"
             "```bash\n"
             f"git fetch origin {branch}\n"
-            f"git checkout {branch} 2>/dev/null || git checkout -b {branch} origin/{branch}\n"
+            f"git checkout -B {branch} origin/{branch}\n"
             "```\n\n"
             f"Do ALL work and commits on `{branch}`. Do NOT commit on the daemon's "
             "auto-created `agent/<persona>/<task>` branch — commits there will not reconcile "
             "into the run."
+        )
+
+    def _build_brief_body(
+        self,
+        run_id: str,
+        step_id: str,
+        step_file_content: str,
+        inputs: dict[str, Any] | None = None,
+    ) -> str:
+        """Render the agent's brief (issue body): branch contract + inputs JSON
+        + verbatim step_file (which carries any injected skill). Deterministic
+        for a given (run, step, brief) so it can be built for BOTH create-issue
+        and — crucially — every dispatch, so a reused/deduped/cached issue is
+        REFRESHED with the current brief rather than running the stale one it
+        was first created with (PR #74 review P1: stale-brief invocation)."""
+        # #12: the issue body IS the agent's brief. It must carry the node's
+        # `inputs` — the requirement and upstream outputs (research_brief,
+        # design_discussion, ...) — not just the step_file.
+        body_parts: list[str] = []
+        # #15: inject the single-shared-branch contract so the agent bases work
+        # on the target branch (empty on default-branch flows).
+        contract = self._branch_contract()
+        if contract:
+            body_parts.append(contract)
+        if inputs:
+            body_parts.append(
+                "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
+            )
+        if step_file_content:
+            body_parts.append("## Task\n" + step_file_content)
+        # cli.mjs requires non-empty --body; use a placeholder when both are empty.
+        return "\n\n".join(body_parts) or (
+            f"(no step_file provided — run {run_id} step {step_id})"
         )
 
     def _resolve_tracker_id(
@@ -810,35 +1210,7 @@ class MulticaAgentSpawn:
                 pass
 
         title = f"[dag:{run_id}:{step_id}] {agent}"
-        # #12: the issue body IS the agent's brief. It must carry the node's
-        # `inputs` — the requirement and upstream outputs (research_brief,
-        # design_discussion, ...) — not just the step_file. Without them the
-        # Multica agent has no requirement and can only improvise from the repo.
-        # Mirror LocalAgentSpawn.build_prompt: inputs as a JSON block + the
-        # verbatim step_file. (Dedup is on the title, so a richer body is safe.)
-        body_parts: list[str] = []
-        # #15: when repo_root is on a non-default (epic) branch, the executor
-        # reconciles the agent's commit FROM that branch. The Multica daemon
-        # auto-checks-out the repo's DEFAULT branch (main) and creates an
-        # agent/<persona>/<task> branch off it, so the agent's commit diverges
-        # from the epic branch and reconcile (ff-only) fails. Inject a branch
-        # contract telling the agent to base its work on the target branch
-        # (mirrors the proven multica-story-dispatch Integration Contract). On
-        # the default branch (e.g. plan, which CREATES its own epic branch) this
-        # is empty, preserving that flow.
-        contract = self._branch_contract()
-        if contract:
-            body_parts.append(contract)
-        if inputs:
-            body_parts.append(
-                "## Inputs\n```json\n" + json.dumps(inputs, indent=2) + "\n```"
-            )
-        if step_file_content:
-            body_parts.append("## Task\n" + step_file_content)
-        # cli.mjs requires non-empty --body; use a placeholder when both are empty.
-        body = "\n\n".join(body_parts) or (
-            f"(no step_file provided — run {run_id} step {step_id})"
-        )
+        body = self._build_brief_body(run_id, step_id, step_file_content, inputs)
 
         # Write intent marker BEFORE the network call (H1 belt-and-suspenders).
         # If the process dies after create-issue returns but before the state write,
@@ -852,9 +1224,15 @@ class MulticaAgentSpawn:
         # --dedup-title makes the Multica server the authoritative idempotency source:
         # cli.mjs lists existing issues and returns the matching one instead of creating
         # a duplicate. This is the primary guard for cross-machine resume (H2).
-        result = self._run_cli_fast(
-            ["create-issue", "--title", title, "--body", body, "--dedup-title", title]
-        )
+        create_args = ["create-issue", "--title", title, "--body", body, "--dedup-title", title]
+        # Bind the issue to the epic branch at creation so the daemon can key
+        # branch-shared worktree reuse off the structured integration_branch column
+        # (the body contract alone is not machine-readable). Empty on the default
+        # branch / non-git repo_root — preserves those flows.
+        create_branch = self._target_branch()
+        if create_branch:
+            create_args += ["--integration-branch", create_branch]
+        result = self._run_cli_fast(create_args)
         tracker_id = result.get("id")
         if not tracker_id:
             raise AgentHandlerError(
@@ -874,12 +1252,69 @@ class MulticaAgentSpawn:
     # CLI dispatch + poll
     # ------------------------------------------------------------------
 
-    def _dispatch(self, tracker_id: str, agent: str) -> None:
-        self._run_cli_fast(
-            ["dispatch", "--issue", tracker_id, "--agent", agent]
-        )
+    def _dispatch(
+        self,
+        tracker_id: str,
+        agent: str,
+        story_id: str | None = None,
+        body: str | None = None,
+    ) -> None:
+        args = ["dispatch", "--issue", tracker_id, "--agent", agent]
+        # Refresh the issue description with the current brief. cli.mjs's
+        # dispatch refresh path (suppliedBody) was previously unreachable
+        # because Python never sent --body, so a reused issue silently ran a
+        # stale brief while the handler still stamped skill_invoked.
+        if body:
+            args += ["--body", body]
+        # Single-shared-branch contract (t-007): when the executor is on an epic
+        # branch, tell the agent to base its work on AND push back to that branch
+        # (origin/{branch}) rather than committing to the daemon's throwaway
+        # agent/<persona>/<task> branch. cli.mjs injects renderIntegrationContract
+        # into the issue body idempotently. Every agent then resets to origin tip
+        # and pushes its commit there, so downstream nodes/stories build on real
+        # prior work and reconcile stays a clean fast-forward (no stale base, no
+        # detached-HEAD harvest). Empty branch (default-branch flows, non-git
+        # repo_root) → omit, preserving the harvest fallback.
+        branch = self._target_branch()
+        if branch:
+            args += ["--integration-branch", branch]
+            if story_id:
+                args += ["--story-id", story_id]
+        # Node issue ids are deterministic per (epic, story, node), so RESTARTING
+        # a previously-failed run re-targets the same issue — whose latest task is
+        # terminal from the prior run, making a plain dispatch a no-op
+        # (STALE_TERMINAL_TASK). HIVE_MULTICA_FORCE_RERUN opts a restart into
+        # resetting such a terminal issue to a fresh dispatchable state. It is a
+        # no-op on a fresh issue (cli.mjs only resets when the latest task is
+        # terminal; an in_progress same-assignee issue still short-circuits as
+        # already_dispatched), so it is safe to pass for every node of a rerun.
+        if os.environ.get("HIVE_MULTICA_FORCE_RERUN", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            args.append("--rerun")
+        self._run_cli_fast(args)
 
     def _poll(self, tracker_id: str) -> dict[str, Any]:
+        """Terminal status for a dispatched tracker issue.
+
+        s4: `cli.mjs poll` (episode-sync.mjs `pollTaskUntilTerminal`) is
+        event-driven for Agent-based bg dispatch — each iteration of its
+        network-poll loop checks the s1 SubagentStop complete.json marker
+        for the task's agent_id FIRST and returns the instant it appears
+        (a filesystem stat), rather than waiting out the full HTTP poll
+        interval. The marker check lives there, not here, because that is
+        where the existing bounded wait loop already runs (this call's
+        `timeout_ms` is the same bound that governed the pre-s4 timer-poll,
+        so a missing/late marker still falls back to plain polling within
+        the SAME bound — never an unbounded wait). This method's shape is
+        otherwise unchanged: one call, one terminal-shaped result.
+
+        Carve-out: Bash `run_in_background` work has no completion hook in
+        this runtime and cannot use the marker — out of scope here because
+        MulticaAgentSpawn only ever dispatches Agent-based work.
+        """
         poll_timeout_s = self._timeout_ms / 1000.0 + 120.0
         return self._run_cli(
             ["poll", "--issue", tracker_id, "--timeout-ms", str(self._timeout_ms)],
@@ -938,9 +1373,20 @@ class AgentHandler:
         spawn: AgentSpawn,
         repo_root: Path | str | None = None,
         plugin_root: Path | str | None = None,
+        *,
+        rlm_binding_resolver: Callable[[str], Any] | None = None,
+        rlm_metric_writer: Callable[[dict[str, Any], str], None] | None = None,
     ) -> None:
         self._spawn = spawn
         self._repo_root = Path(repo_root) if repo_root is not None else None
+        # a-rlm-recursive-node A (EXPERIMENTAL, flag-gated): injection seams for
+        # the RLM recursive wrapper. Both default None and are consulted ONLY on
+        # the ``node.config.rlm`` opt-in path, so a non-rlm node never touches
+        # them and the handler stays byte-identical to pre-A.
+        self._rlm_binding_resolver = rlm_binding_resolver
+        self._rlm_metric_writer = rlm_metric_writer
+        # Inspection handle: the wrapper built for the most recent rlm node.
+        self._last_rlm_wrapper: Any = None
         # step_files are plugin-shipped content (e.g.
         # ``hive/workflows/step-files/plan/research.md``) installed WITH the
         # plugin — they do NOT live inside a consumer project's ``repo_root``.
@@ -957,18 +1403,16 @@ class AgentHandler:
             Path(plugin_root).resolve() if plugin_root is not None else None
         )
 
-    def _read_step_file(self, step_file: str) -> str:
-        """Read the step_file's content verbatim. No transformation.
+    def _resolve_plugin_path(self, rel_or_abs: str, *, label: str) -> str:
+        """Resolve a plugin-shipped path (step_file, persona) against the same
+        plugin_root -> repo_root -> legacy-as-given search order used for
+        step_files, returning a path string usable as-is by any reader.
 
-        ``step_file`` paths in plugin workflows are relative to the plugin
-        root (where the workflow graph and step-files ship). Resolve against
-        the plugin root first, then fall back to ``repo_root`` for
-        project-local workflows. In every case the resolved path MUST stay
-        inside the root it matched — ``..`` segments and absolute paths that
-        escape every allowed root are rejected so a malformed or
-        attacker-controlled workflow cannot inject arbitrary file content.
+        Kept as a path resolver (not a reader) so callers that only need the
+        path — e.g. ``resolve_skill_binding``, which does its own reading —
+        don't pay for a redundant read here.
         """
-        path = Path(step_file)
+        path = Path(rel_or_abs)
         roots: list[Path] = []
         if self._plugin_root is not None:
             roots.append(self._plugin_root.resolve())
@@ -984,32 +1428,37 @@ class AgentHandler:
                 candidate.relative_to(root)
             except ValueError:
                 continue  # escapes this root — try the next allowed root
-            try:
-                return candidate.read_text(encoding="utf-8")
-            except FileNotFoundError as exc:
-                last_not_found = exc
-                continue  # not under this root — try the next
-            except OSError as exc:
-                raise AgentHandlerError(
-                    f"failed to read step_file {step_file}: {exc}"
-                ) from exc
+            if candidate.is_file():
+                return str(candidate)
+            last_not_found = FileNotFoundError(str(candidate))
 
         if not roots:
-            # No configured root — legacy as-given resolution.
-            try:
-                return path.read_text(encoding="utf-8")
-            except FileNotFoundError as exc:
-                raise AgentHandlerError(
-                    f"step_file not found: {step_file}"
-                ) from exc
-            except OSError as exc:
-                raise AgentHandlerError(
-                    f"failed to read step_file {step_file}: {exc}"
-                ) from exc
+            return rel_or_abs
 
         raise AgentHandlerError(
-            f"step_file not found: {step_file}"
+            f"{label} not found: {rel_or_abs}"
         ) from last_not_found
+
+    def _read_step_file(self, step_file: str) -> str:
+        """Read the step_file's content verbatim. No transformation.
+
+        ``step_file`` paths in plugin workflows are relative to the plugin
+        root (where the workflow graph and step-files ship). Resolve against
+        the plugin root first, then fall back to ``repo_root`` for
+        project-local workflows. In every case the resolved path MUST stay
+        inside the root it matched — ``..`` segments and absolute paths that
+        escape every allowed root are rejected so a malformed or
+        attacker-controlled workflow cannot inject arbitrary file content.
+        """
+        resolved = self._resolve_plugin_path(step_file, label="step_file")
+        try:
+            return Path(resolved).read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise AgentHandlerError(f"step_file not found: {step_file}") from exc
+        except OSError as exc:
+            raise AgentHandlerError(
+                f"failed to read step_file {step_file}: {exc}"
+            ) from exc
 
     def handle(
         self,
@@ -1022,9 +1471,77 @@ class AgentHandler:
                 f"node {node.id!r} has no agent string for AgentHandler"
             )
 
+        story_id = inputs.get("story_id")
+        if (
+            story_id
+            and _story_spec_is_empty(inputs.get("story_spec"))
+        ):
+            raise FatalAgentHandlerError(
+                f"story_spec is null/empty for story={story_id} — "
+                "refusing to dispatch a spec-less agent"
+            )
+
         step_file_content = ""
         if node.step_file:
             step_file_content = self._read_step_file(node.step_file)
+
+        # Match-resolve-load-invoke seam (see hive/lib/skill_binding.py). A node
+        # opting in via ``config.skill_binding`` gets its bound skill actually
+        # resolved, loaded, and injected into the brief HERE — by executable
+        # code, not by asking the spawned agent to run the resolver itself from
+        # step_file prose (an inert binding otherwise: the agent can skip step 2
+        # and nothing catches it). Fails closed: a missing/unreadable binding
+        # raises before the agent is ever spawned.
+        resolved_skills: list = []
+        skill_binding_cfgs = _skill_binding_config(node)
+        if skill_binding_cfgs is not None:
+            injections: list[str] = []
+            for cfg in skill_binding_cfgs:
+                persona_path = self._resolve_plugin_path(
+                    cfg["persona_path"], label="skill_binding persona"
+                )
+                persona_real = Path(persona_path).resolve()
+                # Bind a persona to exactly one trust domain. A union of the
+                # plugin and consumer roots lets ambient path expansion swap a
+                # trusted plugin skill for consumer-controlled content. Pick
+                # the root that actually supplied this persona, then use that
+                # same explicit root for both variable expansion and realpath
+                # containment. Rootless explicit personas are confined to
+                # their own directory rather than gaining an unbounded path.
+                persona_root: Path | None = None
+                candidate_roots = [
+                    r.resolve()
+                    for r in (self._plugin_root, self._repo_root, default_plugin_root())
+                    if r is not None
+                ]
+                for candidate_root in candidate_roots:
+                    try:
+                        persona_real.relative_to(candidate_root)
+                    except ValueError:
+                        continue
+                    persona_root = candidate_root
+                    break
+                if persona_root is None:
+                    persona_root = persona_real.parent
+                try:
+                    rs = resolve_skill_binding(
+                        persona_path,
+                        cfg["trigger"],
+                        require_binding=bool(cfg.get("require", True)),
+                        allowed_roots=[str(persona_root)],
+                        plugin_root=str(persona_root),
+                    )
+                except SkillBindingError as exc:
+                    raise AgentHandlerError(
+                        f"skill binding fail-closed for node {node.id!r}: {exc}"
+                    ) from exc
+                if rs is not None:
+                    resolved_skills.append(rs)
+                    injections.append(
+                        build_skill_injection(rs, in_graph=bool(cfg.get("in_graph", False)))
+                    )
+            if injections:
+                step_file_content = "\n\n".join(injections) + "\n\n" + step_file_content
 
         # #22: under-run guard with built-in re-dispatch (Multica binding only).
         # A Multica agent can report 'completed' yet end its session without
@@ -1046,6 +1563,13 @@ class AgentHandler:
             if getattr(o, "name", None)
             and getattr(o, "name", None) not in _SPAWN_METADATA_OUTPUTS
         ]
+        # Bound skills are executable contracts on every spawn backend, not
+        # merely prompt decoration. Local/session/test backends must not report
+        # success while omitting declared evidence such as verify_evidence.
+        # Unbound local nodes preserve their historical permissive behaviour.
+        enforce_declared_outputs = bool(semantic_outputs) and (
+            is_multica or bool(resolved_skills)
+        )
         max_under_run_attempts = 3 if (is_multica and semantic_outputs) else 1
 
         # #13-enforce: prepend a hard output-contract to the brief for Multica
@@ -1057,8 +1581,16 @@ class AgentHandler:
         # and test spawns consume canned outputs and get no contract.
         effective_step_file = step_file_content
         if is_multica and semantic_outputs:
+            # Bracket the brief: the prepended preamble is read FIRST and then
+            # forgotten by turn-end after a long task (observed: the tester ran
+            # the dev-supplied passing tests, reported done, and skated past the
+            # gitignored outputs.yaml write). Appending the same obligation as the
+            # LAST thing the agent sees keeps it salient at the stop boundary —
+            # the moment the write is actually due.
             effective_step_file = (
-                _output_contract_preamble(semantic_outputs) + step_file_content
+                _output_contract_preamble(semantic_outputs)
+                + step_file_content
+                + _output_contract_closer(semantic_outputs)
             )
 
         def _filled(o: dict[str, Any]) -> int:
@@ -1066,6 +1598,37 @@ class AgentHandler:
 
         def _missing(o: dict[str, Any]) -> list[str]:
             return [n for n in semantic_outputs if _output_is_empty(o.get(n))]
+
+        def _apply_skill_evidence(o: dict[str, Any]) -> dict[str, Any]:
+            """Overlay harness-owned evidence after every spawn/harvest."""
+            if not resolved_skills:
+                return o
+            stamped = dict(o)
+            paths = [rs.skill_path for rs in resolved_skills]
+            stamped["skill_invoked"] = paths[0] if len(paths) == 1 else paths
+            return stamped
+
+        # a-rlm-recursive-node A: flag-gate. When node.config.rlm opts in, run the
+        # spawn through the RLM recursive harness (constrained toolset + depth-1
+        # register_binding sub-call + measured metric). When the flag is
+        # absent/false, ``active_spawn is self._spawn`` — the SAME object called
+        # with the SAME args, so the non-rlm path is byte-identical to pre-A.
+        #
+        # codex finding 2: the opt-in decision is a MINIMAL inline config check
+        # (``_rlm_opt_in``, no rlm.py import) so a flag-off node NEVER imports the
+        # RLM module — pre-A had no such dependency. The heavy wrapper is imported
+        # ONLY inside the true (opt-in) branch.
+        active_spawn: Any = self._spawn
+        if _rlm_opt_in(node):
+            from .rlm import RLMRecursiveWrapper
+
+            active_spawn = RLMRecursiveWrapper(
+                self._spawn,
+                node,
+                binding_resolver=self._rlm_binding_resolver,
+                metric_writer=self._rlm_metric_writer,
+            )
+            self._last_rlm_wrapper = active_spawn
 
         outputs: dict[str, Any] = {}
         attempt_work_dirs: list[str] = []
@@ -1075,7 +1638,7 @@ class AgentHandler:
         attempt_outputs_by_work_dir: dict[str, dict[str, Any]] = {}
         for attempt in range(1, max_under_run_attempts + 1):
             try:
-                outputs = self._spawn(
+                outputs = active_spawn(
                     agent=node.agent,
                     step_file_content=effective_step_file,
                     inputs=dict(inputs),
@@ -1093,6 +1656,8 @@ class AgentHandler:
                 raise AgentHandlerError(
                     f"agent-spawn returned non-dict outputs for node {node.id!r}"
                 )
+
+            outputs = _apply_skill_evidence(outputs)
 
             wd = outputs.get("work_dir")
             if isinstance(wd, str) and wd:
@@ -1117,23 +1682,38 @@ class AgentHandler:
             # surfaces — seeding each candidate with ITS OWN attempt metadata so a
             # recovered earlier work_dir doesn't inherit a later attempt's tree.
             recovered: dict[str, Any] | None = None
-            for prior in attempt_work_dirs:
-                cand = self._spawn.reharvest(
-                    prior, base=attempt_outputs_by_work_dir.get(prior)
-                )
-                if _filled(cand) > _filled(recovered or {}):
-                    recovered = cand
-            # Accept only a COMPLETE recovery — every declared output present.
+            for delay_s in _REHARVEST_DELAYS_S:
+                if delay_s:
+                    time.sleep(delay_s)
+                for prior in attempt_work_dirs:
+                    cand = self._spawn.reharvest(
+                        prior, base=attempt_outputs_by_work_dir.get(prior)
+                    )
+                    if _filled(cand) > _filled(recovered or {}):
+                        recovered = cand
+                # Accept only a COMPLETE recovery — every declared output
+                # present. A partial outputs.yaml never flows downstream.
+                if recovered is not None and not _missing(recovered):
+                    outputs = _apply_skill_evidence(recovered)
+                    break
             if recovered is not None and not _missing(recovered):
-                outputs = recovered
                 break
 
             if attempt >= max_under_run_attempts:
                 raise AgentHandlerError(
-                    f"node {node.id!r}: agent reported completed but produced none "
-                    f"of its declared outputs {semantic_outputs} after "
+                    f"node {node.id!r}: agent reported completed but did not produce "
+                    f"all declared outputs {semantic_outputs}; missing "
+                    f"{_missing(recovered or outputs)} after "
                     f"{max_under_run_attempts} attempts (under-run)"
                 )
+
+        outputs = _apply_skill_evidence(outputs)
+        missing_outputs = _missing(outputs)
+        if enforce_declared_outputs and missing_outputs:
+            raise AgentHandlerError(
+                f"node {node.id!r}: agent did not produce all declared outputs; "
+                f"missing {missing_outputs}"
+            )
 
         # hde-4 Risk #9 guard: when this node ran in a parallel branch
         # context, two siblings could both want to write the SAME
@@ -1165,5 +1745,24 @@ class AgentHandler:
                 slug=insight_slug,
                 run_id=run_id,
             )
+
+        # Observe-contract enforcement (PR #74 review P1). Resolving the
+        # observe skill enables this automatically; config.observe_contract is
+        # retained only as a compatibility opt-in for unbound callers.
+        # The contract is enforced HERE, at the runtime boundary, BEFORE the
+        # output is returned and can flow downstream as advice — not only in a
+        # test that inspects the payload after the fact. An advisor output that
+        # claims/implies a gate verdict or a blocking instruction fails the node
+        # closed rather than being forwarded.
+        if _observe_contract_enabled(node, resolved_skills):
+            result = validate_observe_output(
+                {k: v for k, v in outputs.items() if k not in _SPAWN_METADATA_OUTPUTS}
+            )
+            if not result.accepted:
+                raise AgentHandlerError(
+                    f"node {node.id!r}: observe/advisor output violates the observe "
+                    f"contract (advisor is verdict-free, non-blocking): "
+                    f"{'; '.join(result.violations)}"
+                )
 
         return NodeOutput(outputs=outputs)

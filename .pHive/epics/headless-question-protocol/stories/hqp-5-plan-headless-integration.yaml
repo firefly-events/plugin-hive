@@ -1,0 +1,107 @@
+id: hqp-5-plan-headless-integration
+epic: headless-question-protocol
+title: Route plan's release/sidecar/branch prompts through the question gateway
+status: completed
+complexity: low
+methodology: classic
+depends_on: [hqp-2-question-gateway-envelope]
+
+description: |
+  /hive:plan has blocking prompt points: the branch-switch confirmation
+  (skills/plan/SKILL.md:106) and step 14b's version_bump question
+  (skills/plan/SKILL.md:707, "Does this epic bump the version? major | minor | patch |
+  none"). Route both through question_gateway.ask_or_emit() (hqp-2).
+
+  This exact epic's own planning session (the one that produced this story) is the
+  live interactive-mode regression baseline — 14b was answered interactively during
+  this planning run via AskUserQuestion, and that exact behavior must be unchanged
+  by this story.
+
+  IMPLEMENTATION NOTE (post-hoc correction, landed in commit b0df31fd during
+  implementation, not caught until this hqp-7 drift-check pass updated this
+  story YAML to match): a step 14c (sidecar_retention question) was described in
+  the plan-time design-discussion.md and this story's original acceptance
+  criteria, on the assumption it existed in skills/plan/SKILL.md the same way it
+  does in the plugin version this planning session itself was loaded from (an
+  installed plugin cache, v2.15.1, built from the separately-synced "main"
+  branch — see epic.yaml's git_flow note). It does NOT exist in this repo's
+  actual `develop`-branch skills/plan/SKILL.md source (1222 lines, confirmed via
+  grep at implementation time — zero occurrences of "sidecar_retention"). This
+  story therefore wires only what actually exists on this branch: the
+  branch-switch confirm and 14b. Step 14c gets the same treatment as a
+  fast-follow if/when it lands on develop.
+
+acceptance_criteria:
+  - "Given HIVE_HEADLESS unset, when /hive:plan reaches the branch-switch confirm or 14b, then each behaves exactly as it did during this epic's own planning session (unchanged prompts)"
+  - "Given HIVE_HEADLESS=1 and a branch switch is needed, when /hive:plan reaches step 0, then it writes an envelope for the branch-switch confirmation, exits with AWAITING_ANSWERS, and does not switch branches until answered"
+  - "Given HIVE_HEADLESS=1, when /hive:plan reaches step 14b, then it writes a version_bump envelope with the exact four literal options (major|minor|patch|none) and validates the answer against those four literals on resume, applying the same default-to-none-with-warning fallback the skill already has for an unrecognized interactive answer"
+  - "epic.yaml produced by a headless run with fixture answers is byte-identical (aside from timestamps) to one produced interactively with the same answers"
+  - "DESCOPED (see IMPLEMENTATION NOTE): step 14c sidecar_retention does not exist in this repo's develop-branch skills/plan/SKILL.md — not wired, not tested, not claimed as done"
+
+steps:
+  - id: research
+    description: Re-read skills/plan/SKILL.md:106,707 against current HEAD, including the existing fallback/default behavior for an unrecognized answer (already specified in the skill for 14b) that must be preserved on the headless path too. CONFIRMED during implementation that no 14c/sidecar_retention text exists in this file — see IMPLEMENTATION NOTE in description.
+    agent: researcher
+  - id: implement
+    description: Wire both prompt points to question_gateway.ask_or_emit(), preserving the exact literal option sets and existing fallback/default logic for unanswered or invalid responses.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: Headless run hitting both prompt points with fixture answers, plus a fixture run exercising the existing unrecognized-answer-defaults-to-none fallback headlessly; interactive-mode regression against this epic's own planning transcript as the baseline.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Confirm the version_bump default-on-invalid resolution logic is preserved unchanged on the headless path.
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: skills/plan/SKILL.md
+      purpose: Contains both prompt points at the line numbers cited above, plus the existing version_bump fallback logic that must be preserved. Does NOT contain a 14c/sidecar_retention prompt on this branch.
+
+files_to_modify:
+  - file: skills/plan/SKILL.md
+    change: Route lines 106 and 707 through question_gateway.ask_or_emit(), preserving existing option literals and fallback behavior.
+
+cross_cutting:
+  - concern: documentation
+    action: "skills/plan/SKILL.md's own prose IS the documentation for these three prompt points; no separate doc file needed."
+  - concern: versioning
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
+
+metric:
+  applies: true
+  name: plan.headless_prompt_completion_rate
+  direction: up
+  unit: ratio
+  baseline: 0
+  target: 1.0
+  window: "story integrate step"
+  source:
+    kind: manual
+    ref: "Headless fixture run through all three prompt points, described in the test step, including the invalid-answer-defaults-to-none fallback case"
+  verify_at: "story integrate step"
+  owner: tester
+
+risks:
+  - severity: medium
+    description: The 14b prompt already carries non-trivial default/fallback logic (default-to-none-with-warning) that's easy to accidentally drop when re-routing through a new gateway call.
+    mitigation: Explicit acceptance criteria and a dedicated fixture test for the fallback path, not just the happy path.
+  - severity: low
+    description: Story was planned against an installed plugin cache version of skills/plan/SKILL.md ahead of this repo's develop branch (includes a 14c that doesn't exist here yet) — descoping 14c is correct for THIS branch, but the fast-follow needs tracking so it isn't silently forgotten when 14c does land.
+    mitigation: Documented explicitly in this story's IMPLEMENTATION NOTE and DESCOPED acceptance criterion, rather than silently dropped.
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/design-discussion.md
+    relevant_excerpt: |
+      Plan integration (`skills/plan/SKILL.md` steps 0/14b/14c) route their prose
+      prompts through the gateway. (Written pre-implementation; 14c was
+      subsequently found not to exist on this branch — see this story's
+      IMPLEMENTATION NOTE.)

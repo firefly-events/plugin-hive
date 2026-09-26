@@ -1,0 +1,183 @@
+id: hqp-2-question-gateway-envelope
+epic: headless-question-protocol
+title: Question-gateway primitive + question-envelope schema
+status: completed
+complexity: medium
+methodology: classic
+depends_on: [hqp-1-runtime-mode-detection]
+
+description: |
+  Build the shared "ask or emit" gateway that skills call instead of directly using
+  AskUserQuestion or blocking prose. This is the single primitive every skill
+  integration story (hqp-3 kickoff, hqp-4 design, hqp-5 plan) routes through — the
+  whole point is one envelope shape and one detection path, not three divergent ones
+  (research brief confirmed the current interactive-only gap spans 15+ call sites
+  across three skills with zero shared handling).
+
+  Interactive path (detect_interactive_mode() from hqp-1 resolves to "interactive"):
+  behaves exactly as today at the call site — calls AskUserQuestion where the call
+  site already does, or emits the existing prose where it doesn't. This story does
+  NOT change call-site behavior; hqp-3/4/5 wire the actual call sites.
+
+  Headless path: batches every question passed in one call into a single envelope
+  file at `.pHive/questions/<skill>-<invocation-id>.yaml`, scoped to the calling
+  skill's current *phase* (not one envelope per individual question — see the
+  batching rationale in design-discussion.md §2.1b; per-question envelopes would mean
+  a headless kickoff needs 7+ full skill re-invocations instead of ~4-5). Prints a
+  structured `AWAITING_ANSWERS` status block to stdout and exits cleanly — no polling,
+  no process left waiting.
+
+  Envelope carries a renewable `deadline` field (OAuth-refresh shape, not a poll
+  loop — this was corrected during planning after an earlier poll-mode draft was
+  rejected). An orchestrator that needs more time than
+  `headless.answer_deadline_seconds` (default 1800, matching this repo's existing
+  Multica timeout precedents) writes a fresh, later `deadline` before the current one
+  lapses; `renewal_count` increments each time. On re-invocation, the skill consumes
+  an `answered` envelope, re-exits unchanged on a still-valid `pending` envelope, and
+  on an expired unrenewed envelope follows `headless.deadline_expired_action`
+  (`re-emit` default, non-destructive; `fail` for orchestrators that want expiry
+  treated as unrecoverable).
+
+  IMPLEMENTATION NOTE (post-hoc correction, CodeRabbit review rounds 1-3 on PR
+  #341): the implementation this AC describes shipped with three fixes beyond
+  what was planned — (1) **delete-on-consume**: the gateway now deletes an
+  envelope file once its answers are extracted, because phase ids are reused
+  across genuinely separate invocations (e.g. a re-kickoff months later reuses
+  phase `1a`) and a surviving answered envelope would silently short-circuit
+  that later invocation with a stale answer forever; (2) both `skill` and
+  `invocation_id` are sanitized when building the on-disk path/glob (an
+  earlier version only sanitized `invocation_id`); (3) invocation ids use
+  millisecond precision, not whole-second, to avoid filename collisions. See
+  hive/references/question-envelope-schema.md's "Deletion on consume" section
+  for the authoritative, corrected mutation-lifecycle description.
+
+acceptance_criteria:
+  - "Given interactive mode, when ask_or_emit() is called with a question spec, then it invokes the call site's existing AskUserQuestion/prose path unchanged and does not write an envelope file"
+  - "Given headless mode and a batch of N questions for one phase, when ask_or_emit() is called, then exactly one envelope file is written at .pHive/questions/<skill>-<invocation-id>.yaml containing all N questions, with status: pending and a deadline computed from headless.answer_deadline_seconds"
+  - "Given a pending envelope with an orchestrator write of answer: values and status: answered, when the skill re-invokes ask_or_emit() for the same phase, then it returns the answers without re-prompting, without creating a new envelope, AND deletes the consumed envelope file (delete-on-consume, added post-plan — see IMPLEMENTATION NOTE)"
+  - "Given a consumed (and thus deleted) envelope for phase P, when ask_or_emit() is called again for the same skill+phase P at a much later time (simulating a genuinely separate invocation, e.g. a re-kickoff months later), then it does NOT return the stale prior answer — it asks again (writes a fresh pending envelope)"
+  - "Given a pending envelope whose deadline has not lapsed, when the skill re-invokes ask_or_emit() for the same phase, then it re-exits with the same AWAITING_ANSWERS status and does not mutate the envelope"
+  - "Given a pending envelope whose deadline lapses with no renewal and no answer, when the skill re-invokes ask_or_emit() for the same phase, then it follows headless.deadline_expired_action (default re-emit: writes a fresh envelope with a new deadline; fail: raises a machine-readable error)"
+  - "Given a pending envelope, when an external writer updates deadline to a later timestamp and increments renewal_count before the prior deadline lapses, then the envelope remains valid pending (no expiry action fires) on the next re-invocation"
+  - "hive/references/question-envelope-schema.md documents the schema per this repo's established schema-doc convention (Purpose/Data-shape/Cardinality/Storage-rule table, mutation-rules with an explicit pending->answered/pending->pending(renewed) transition table, closure invariant, worked examples, closing 'does NOT commit to' fence)"
+
+steps:
+  - id: research
+    description: Re-confirm hqp-1's detect_interactive_mode() contract is landed and stable. Read hive/references/triage-queue-schema.md and .pHive/metrics/experiment-envelope.schema.md as the two closest schema-doc precedents to follow for structure and tone.
+    agent: researcher
+  - id: implement
+    description: |
+      Add hive/lib/question_gateway.py and hive/lib/question_gateway.js exporting
+      ask_or_emit(question_spec_list) -> answers_list, implementing the interactive
+      passthrough, headless envelope-write, resume-consume, and deadline
+      renewal/expiry logic described above. Add the headless.* config block
+      (answer_deadline_seconds default 1800, deadline_expired_action default
+      re-emit) to hive/hive.config.yaml (shipped baseline) with root-first
+      precedence, matching the pattern used elsewhere in this file for
+      planning.mode/sidecar_retention. Write hive/references/question-envelope-schema.md.
+    agent: developer
+    depends_on: [research]
+  - id: test
+    description: |
+      Fixture-driven tests: (1) write envelope, external answer-write, resume
+      consumes without re-prompt; (2) deadline renewal keeps envelope valid past
+      the original deadline; (3) expiry with no renewal triggers
+      deadline_expired_action for both re-emit and fail settings; (4) interactive
+      mode never writes an envelope file.
+    agent: tester
+    depends_on: [implement]
+  - id: review
+    description: Review the schema doc against triage-queue-schema.md's structural convention (does it have every required section?). Review the gateway module for exact mirroring of the interactive-path passthrough (no behavior change on that path).
+    agent: reviewer
+    depends_on: [test]
+  - id: integrate
+    description: Commit and push to feat/headless-question-protocol.
+    agent: developer
+    depends_on: [review]
+
+context:
+  codebase: /Users/dostal/Documents/work/dostal/code/plugin-hive-fork
+  tech_stack: {}
+  key_files:
+    - path: hive/references/triage-queue-schema.md
+      purpose: Closest existing precedent for a machine-readable, absence-tolerant .pHive/ artifact schema doc — mirror its section structure exactly.
+    - path: hive/lib/config.py
+      purpose: Reference for the root-first config precedence resolver the new headless.* config block must follow.
+
+files_to_modify:
+  - file: hive/lib/question_gateway.py
+    change: New. ask_or_emit(question_spec_list) -> answers_list with interactive passthrough + headless envelope/resume/deadline logic.
+  - file: hive/lib/question_gateway.js
+    change: New. Same contract, JS side.
+  - file: hive/references/question-envelope-schema.md
+    change: New. Full schema doc per this repo's convention (see acceptance criteria).
+  - file: hive/hive.config.yaml
+    change: Add headless.answer_deadline_seconds (default 1800) and headless.deadline_expired_action (default re-emit) to the shipped baseline.
+  - file: hive/lib/test/question_gateway.test.mjs
+    change: New. Fixture-driven tests for the JS implementation.
+  - file: hive/lib/test/question_gateway_test.py
+    change: New. Fixture-driven tests for the Python implementation.
+
+code_examples:
+  - title: Question envelope shape (from design discussion, post-grill)
+    file: .pHive/epics/headless-question-protocol/docs/design-discussion.md
+    snippet: |
+      id: kickoff-2026-07-25T22-10-00Z
+      skill: kickoff
+      phase: "1a"
+      status: pending
+      provenance:
+        raised_by: kickoff
+        raised_at: "2026-07-25T22:10:00Z"
+      deadline: "2026-07-25T22:40:00Z"
+      renewal_count: 0
+      questions:
+        - qid: metrics-opt-in
+          text: "Enable metrics tracking?"
+          kind: single-select
+          options: ["yes", "no"]
+          required: true
+          answer: null
+
+design_decisions:
+  - decision: Batch questions per skill-phase into one envelope, not one envelope per question.
+    rationale: Grill finding U2 during planning — kickoff alone has 7+ prompt points; per-question envelopes would mean 7+ full skill re-invocations for a headless run, worse than the prose-scraping workaround this epic replaces.
+  - decision: Renewable deadline instead of a poll loop.
+    rationale: User feedback during planning explicitly rejected a poll-mode design (skill process sitting in a loop) in favor of an OAuth-refresh-style renewable expiry, matching how this repo already tolerates long-running Multica story/persona timeouts (1800s precedent).
+  - decision: Delete the envelope file on consume, rather than leaving it as a permanent answered record.
+    rationale: Not part of the original plan — added in CodeRabbit review round 3 on PR #341 after a real bug was found. Phase ids (1a, 1b, etc.) are reused across genuinely separate invocations of the same skill; without deletion, find_envelope_for_phase would match the OLD answered envelope forever on any later invocation, silently short-circuiting re-kickoff preservation prompts with a stale answer.
+  - decision: detectInteractiveMode/askOrEmit (JS, camelCase) vs detect_interactive_mode/ask_or_emit (Python, snake_case) — no cross-language name aliasing.
+    rationale: Matches this repo's existing per-language convention already established in hive/lib/config.js (camelCase exports) vs hive/lib/config.py (snake_case exports) for the identical job. Flagged twice by CodeRabbit as a "duplicate" finding across review rounds 1-3; held the position each time as intentional, not a bug.
+
+cross_cutting:
+  - concern: documentation
+    action: "question-envelope-schema.md IS the primary documentation deliverable for this story — no separate doc update needed beyond it and this story's own YAML."
+  - concern: versioning
+    action: "Consumer-visible new behavior — covered by epic.yaml's version_bump: minor flag, consumed at actual release-cutting time by /hive:ship (which may bundle multiple epics into one plugin.json/marketplace.json bump, per this repo's accumulate-then-release convention). This epic's own CHANGELOG.md bullet is added now under ## [Unreleased] (see the plan-dag-cutover bullets already there as precedent)."
+
+metric:
+  applies: true
+  name: headless.envelope_round_trip_success_rate
+  direction: up
+  unit: ratio
+  baseline: null
+  target: 1.0
+  window: "story integrate step"
+  source:
+    kind: manual
+    ref: "Fixture test suite pass rate for the 6 acceptance-criteria scenarios above — all must pass for the story to integrate; 1.0 means all fixture scenarios (interactive passthrough, envelope write, resume-consume, deadline validity, expiry-with-renewal, expiry-without-renewal) pass."
+  verify_at: "story integrate step"
+  owner: tester
+
+risks:
+  - severity: medium
+    description: The renewable-deadline logic (comparing timestamps, handling renewal races) is the trickiest correctness surface in this epic and everything downstream depends on it.
+    mitigation: Dedicated fixture tests for renewal-before-expiry and expiry-without-renewal as explicit, separate acceptance criteria (not folded into a single generic test).
+
+references:
+  - path: .pHive/epics/headless-question-protocol/docs/grill-record.md
+    relevant_excerpt: |
+      U2 — kickoff alone has 7+ prompt points across phases. If each one is a
+      separate envelope + separate full-skill re-run, a headless kickoff could
+      require 7+ round trips... Question for planner: should envelopes batch to
+      phase-boundary granularity?

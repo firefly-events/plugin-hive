@@ -11,6 +11,7 @@ from .errors import (
     CycleError,
     DanglingRefError,
     InvalidInputSourceError,
+    LoopConfigError,
     TimeoutOutOfRangeError,
     TypeMismatchError,
 )
@@ -18,6 +19,7 @@ from .model import (
     VALID_INPUT_SOURCES,
     VALID_OUTPUT_TYPES,
     Graph,
+    NodeType,
 )
 
 
@@ -71,8 +73,18 @@ def _detect_cycle(graph: Graph) -> list[str] | None:
     return None
 
 
-def validate_graph(graph: Graph) -> None:
-    """Raise the appropriate typed error on the first violation."""
+def validate_graph(graph: Graph, *, allow_unexpanded_loop: bool = False) -> None:
+    """Raise the appropriate typed error on the first violation.
+
+    ``allow_unexpanded_loop`` (pr20-fable-review T5): when True, skip ONLY
+    the "LOOP must not reach the executor" rule below — every other rule
+    (dangling refs, cycles, input sources, output types, timeouts) still
+    runs against a graph that still carries an authoring-only, not-yet-
+    expanded LOOP node (e.g. one with no ``feature`` opt-in tag). Previously
+    callers that needed to validate such a graph had to skip validate_graph
+    entirely, which hid cycle/dangling-dep defects behind the same
+    exemption meant only for the LOOP-runtime-invariant rule.
+    """
     # Dangling depends_on
     for node in graph.nodes.values():
         for predecessor_id in node.depends_on:
@@ -113,6 +125,22 @@ def validate_graph(graph: Graph) -> None:
                     output_name=output.name,
                     bad_type=output.type,
                 )
+
+    # LOOP nodes must not reach the executor — LOOP is an authoring-only
+    # keyword consumed by the load-time expander (s2-unroll-expander).
+    # A LOOP node presented to validate_graph means the expander has NOT run,
+    # which is a hard authoring error (post-expand invariant).
+    if not allow_unexpanded_loop:
+        for node in graph.nodes.values():
+            if node.node_type != NodeType.LOOP:
+                continue
+            raise LoopConfigError(
+                node_id=node.id,
+                reason=(
+                    "LOOP is an authoring keyword only — must not reach the executor. "
+                    "Re-plan the workflow through the loader (unroll pass) before execution."
+                ),
+            )
 
     # Timeouts
     for node in graph.nodes.values():

@@ -31,6 +31,13 @@ def _write_workflow(tmp_path: Path) -> Path:
                 agent: researcher
                 task: do research
                 depends_on: []
+                inputs:
+                  - name: story_id
+                    source: context
+                    context_key: story_id
+                  - name: story_spec
+                    source: context
+                    context_key: story_spec
               - id: author
                 agent: technical-writer
                 task: write it up
@@ -114,6 +121,33 @@ def test_run_end_to_end_with_stub(tmp_path):
     assert materialised["author"].outputs == {"y": 2}
     # both agent nodes dispatched through the injected binding, in order
     assert [c["step_id"] for c in stub.calls] == ["research", "author"]
+
+
+def test_run_rereads_story_spec_when_rerun_context_is_null(tmp_path):
+    wf = _write_workflow(tmp_path)
+    repo = tmp_path / "repo"
+    story = repo / ".pHive" / "epics" / "epic-1" / "stories" / "story-1.yaml"
+    story.parent.mkdir(parents=True)
+    story.write_text("id: story-1\ntitle: refreshed rerun spec\n", encoding="utf-8")
+    stub = StubAgentSpawn()
+
+    run(
+        wf,
+        spawn=stub,
+        run_id="rerun-story-spec",
+        repo_root=repo,
+        context={
+            "epic_id": "epic-1",
+            "story_id": "story-1",
+            "story_spec": None,
+        },
+        env={},
+    )
+
+    assert stub.calls[0]["inputs"]["story_spec"] == {
+        "id": "story-1",
+        "title": "refreshed rerun spec",
+    }
 
 
 def test_run_persists_run_state(tmp_path):

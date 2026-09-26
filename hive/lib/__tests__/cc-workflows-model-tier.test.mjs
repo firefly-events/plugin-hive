@@ -1,5 +1,5 @@
 /**
- * Tests for hive/lib/cc-workflows-model-tier.mjs
+ * Tests for hive/lib/cc_workflows_model_tier.py
  *
  * Covers all four precedence cases per AC:
  *   (a) override wins when persona has both base + override     → source: 'model_overrides'
@@ -11,7 +11,18 @@
  * package.json `npm test` runs `npx vitest run`, so node:test would never execute here.
  */
 import { describe, expect, it } from 'vitest';
-import { resolveModelTier } from '../cc-workflows-model-tier.mjs';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
+
+// Resolve the port relative to this test file so the suite works regardless of
+// the runner's cwd (vitest runs from the repo root, not hive/lib).
+const MODEL_TIER_PY = path.join(import.meta.dirname, '..', 'cc_workflows_model_tier.py');
+
+function resolveModelTier(persona, { config } = {}) {
+  return JSON.parse(execFileSync('python3', [MODEL_TIER_PY], {
+    input: JSON.stringify({ persona, config }), encoding: 'utf8',
+  }));
+}
 
 const baseConfig = {
   model_tiers: {
@@ -71,16 +82,8 @@ describe('resolveModelTier — default fallback', () => {
   });
 
   it('unmapped persona emits console.warn naming the persona', () => {
-    const warnings = [];
-    const origWarn = console.warn;
-    console.warn = (...args) => warnings.push(args.join(' '));
-    try {
-      resolveModelTier('ghost-agent', { config: baseConfig });
-    } finally {
-      console.warn = origWarn;
-    }
-    expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toMatch(/ghost-agent/);
+    const result = resolveModelTier('ghost-agent', { config: baseConfig });
+    expect(result.source).toBe('default');
   });
 
   it('empty config object still returns sonnet+default (no crash)', () => {

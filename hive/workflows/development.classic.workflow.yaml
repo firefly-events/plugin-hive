@@ -137,12 +137,22 @@ steps:
     agent: backend-developer
     step_file: hive/workflows/steps/development-classic/step-03-implement-backend.md
     task: >
-      Implement the BACKEND scope of the story per the research brief.
-      APIs, server logic, database, services, infrastructure ONLY.
+      Implement the story per the research brief. Primary scope is the
+      BACKEND (APIs, server logic, database, services, infrastructure), but
+      this lane is ALSO the general/default implementer: when preflight
+      classifies a story as neither backend-code nor frontend-code (e.g.
+      docs, analysis, config, or a research deliverable), the work still
+      belongs to a developer and lands here rather than being skipped.
     depends_on:
       - preflight
       - write-brief
-    when: "$preflight.output.needs_backend == true"
+    # Default-lane predicate: run when backend work is needed OR when the story
+    # needs NEITHER backend nor frontend code (analysis/doc/config deliverables).
+    # A story with a deliverable must never skip every implement lane and still
+    # report "completed" (the ph-6 false-green class). Only a frontend-ONLY story
+    # (needs_frontend && !needs_backend) skips this lane. Grammar: && binds tighter
+    # than ||, no parens -> parses as (nb==true) || (nb==false && nf==false).
+    when: "$preflight.output.needs_backend == true || $preflight.output.needs_backend == false && $preflight.output.needs_frontend == false"
     inputs:
       - name: research_brief
         source: step_output
@@ -204,6 +214,10 @@ steps:
       Materialise the backend-implement agent's commit before tests run.
     depends_on:
       - backend-implement
+    # Mirror backend-implement's default-lane predicate so the reconcile+test+
+    # review+integrate chain runs for analysis/doc stories too (they route
+    # through backend-implement as the general lane).
+    when: "$preflight.output.needs_backend == true || $preflight.output.needs_backend == false && $preflight.output.needs_frontend == false"
     inputs:
       - name: sha
         source: step_output
@@ -242,6 +256,7 @@ steps:
       Materialise the frontend-implement agent's commit before tests run.
     depends_on:
       - frontend-implement
+    when: "$preflight.output.needs_frontend == true"
     inputs:
       - name: sha
         source: step_output
@@ -326,6 +341,13 @@ steps:
       Materialise the test agent's commit so the gate validates committed test files.
     depends_on:
       - test
+    # C4: single-upstream (trigger_rule doesn't gate here, walker.py:~548).
+    # `test` itself is a multi-upstream join (reconcile-backend/-frontend)
+    # that SKIPS on an empty-domain story — but a skipped upstream still
+    # falls through the legacy single-upstream RUN path unless gated here.
+    # Grammar-legal null-check (predicate-grammar.md's own canonical
+    # example) fail-closes to False (skip) when `test` didn't materialise.
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: sha
         source: step_output
@@ -372,6 +394,10 @@ steps:
       proceeding until committed code and tests exist in the tree.
     depends_on:
       - reconcile-test
+    # C4: single-upstream twin of reconcile-test's `when:` above — without
+    # it, an empty-domain story's skipped `test` still reaches GateHandler,
+    # which hard-fails on the empty `test_artifacts` instead of skipping.
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: test_artifacts
         source: step_output
@@ -398,6 +424,11 @@ steps:
       SKIP THIS STEP if the story is single-platform or backend-only.
     depends_on:
       - gate-code
+    # C4: single-upstream twin of gate-code's `when:` — gate-code SKIPPING
+    # on an empty-domain story must not let platform-verify still RUN
+    # (which would hand review a completed upstream and defeat the
+    # none_failed_min_one_success skip cascade at review's join).
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: backend_implementation
         source: step_output
@@ -435,6 +466,13 @@ steps:
       The reviewer MUST be a different agent instance than the developer.
 
       Produce a verdict: passed, needs_optimization, or needs_revision.
+
+      EMIT review_passed (the convergence signal consumed by gate-review):
+      set review_passed=true when the verdict is passed OR needs_optimization
+      (needs_optimization is non-blocking nits/suggestions, not a defect);
+      set it false only for needs_revision. This MUST match review_verdict —
+      the terminal gate permits integration only when both values agree.
+      Missing, malformed, or inconsistent values fail closed.
     depends_on:
       - gate-code
       - platform-verify
@@ -463,6 +501,9 @@ steps:
         source: step_output
         step_id: platform-verify
         output_name: platform_results
+        # optional: platform-verify is an optional node (skip_when can short-circuit it);
+        # when it skips or returns no platform_results, review continues with None.
+        optional: true
       - name: research_brief
         source: step_output
         step_id: write-brief
@@ -476,6 +517,8 @@ steps:
         type: string
       - name: review_findings
         type: string
+      - name: review_passed
+        type: json
     optional: false
     timeout_ms: 300000
 
@@ -500,6 +543,11 @@ steps:
       Skip silently if Codex is not enabled, not installed, or not authenticated.
     depends_on:
       - review
+    # C4: single-upstream (trigger_rule doesn't gate here) — without this,
+    # an empty-domain story's skipped `review` still lets codex-review RUN,
+    # which would hand downstream multi-upstream joins (optimize, integrate)
+    # a completed upstream and defeat the skip cascade below `test`.
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: backend_implementation
         source: step_output
@@ -579,6 +627,8 @@ steps:
       Only shut down when all tests green or circuit breaker trips.
     depends_on:
       - review
+    # C4: single-upstream twin of codex-review's `when:` above.
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: backend_implementation
         source: step_output
@@ -600,24 +650,110 @@ steps:
     skip_when: "no test swarm is running for this story"
     timeout_ms: 1800000
 
-  # #16: enforce the review verdict. A needs_revision review must NOT silently
-  # integrate. This gate fails the run when review_verdict == needs_revision,
-  # surfacing the review findings. (Auto-fix-and-re-review is the bounded
-  # converge-loop follow-on, t-005/t-006.)
-  - id: gate-review
-    node_type: gate
-    # needs_revision BLOCKS integrate; passed and needs_optimization both proceed
-    # (optimize is a refinement path, not a blocker).
-    gate: "review_verdict must not equal needs_revision"
-    # Bounded-retry contract (test_classic_gate_has_bounded_retry). The walker
-    # re-dispatches the SAME gate node, so re-evaluating an unchanged verdict
-    # just fails identically — max_attempts:1 = fail loud immediately, no wasted
-    # re-dispatch. Auto-fix-and-re-review (retry_node: review + a fix step) is
-    # the bounded converge-loop follow-on, t-005/t-006.
-    retry:
-      max_attempts: 1
-      on: gate_failed
-      retry_node: review
+  # ── review-fix-cycle body nodes (sub_graph: review-fix-cycle) ──────────────
+  # These two steps form the iterated body of review-converge-loop. They are
+  # separate from the pre-loop `review` step so that `codex-review`, `optimize`,
+  # `dev-standby`, and other post-review steps continue to bind from the stable
+  # pre-loop step ID.
+  #
+  # fix-cycle-implement: developer addresses the findings from the previous review
+  # round and commits the updated implementation.
+  - id: fix-cycle-implement
+    agent: developer
+    sub_graph: review-fix-cycle
+    task: >
+      Apply the changes requested by the reviewer. Address every needs_revision
+      finding. Commit the updated implementation so the next review step can
+      inspect it. Do not change the acceptance criteria — only fix the issues
+      raised.
+    depends_on:
+      - review
+    # C4: single-upstream loop-entry twin of codex-review's `when:` above.
+    # copy.deepcopy in unroll.py propagates this onto round 1's node.when
+    # (fix-cycle-implement__r1), so the whole review-fix-cycle loop
+    # properly skips instead of running when `review` itself skipped.
+    when: "$test.output.test_artifacts != null"
+    inputs:
+      - name: review_findings
+        source: step_output
+        step_id: review
+        output_name: review_findings
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: fix_implementation
+        type: string
+    timeout_ms: 600000
+
+  # fix-cycle-review: reviewer checks the updated implementation and emits
+  # review_passed (bool) as the convergence signal. True for passed or
+  # needs_optimization (Hive's own non-blocking verdict) → rounds K+1..N
+  # skip; false only for needs_revision → the loop continues (up to
+  # max_rounds ceiling).
+  - id: fix-cycle-review
+    agent: reviewer
+    sub_graph: review-fix-cycle
+    task: >
+      Review the exact updated implementation commit identified by reviewed_sha
+      and produced by this round's fix-cycle-implement step.
+      Check that all needs_revision findings from the previous round have been
+      addressed. Produce a verdict: passed, needs_optimization, or needs_revision.
+      Set review_passed=true when the verdict is passed or needs_optimization;
+      set it false only for needs_revision. The two outputs must
+      agree; malformed or inconsistent output is rejected by gate-review.
+    depends_on:
+      - fix-cycle-implement
+    # pr20-fable-review M3: single-upstream twin of fix-cycle-implement's
+    # `when:` above (which mirrors codex-review's `when:` further up).
+    # Without this, an empty-domain story skips fix-cycle-implement, but
+    # fix-cycle-review is single-upstream (legacy RUN path, not a
+    # multi-upstream join) — its k>1 skip_when OR-chain resolves a missing
+    # upstream field to RUN, so every reviewer round would run with no
+    # implementation to review, defeating the C4 skip cascade through
+    # `integrate`'s join.
+    when: "$test.output.test_artifacts != null"
+    inputs:
+      - name: reviewed_sha
+        source: step_output
+        step_id: fix-cycle-implement
+        output_name: commit_sha
+        # Local bindings can modify the shared tree without emitting git
+        # metadata; Multica supplies this from its harvested work_dir HEAD.
+        optional: true
+      - name: fix_implementation
+        source: step_output
+        step_id: fix-cycle-implement
+        output_name: fix_implementation
+        # optional: fix-cycle-implement may return None if no code was changed;
+        # the reviewer inspects the committed diff directly.
+        optional: true
+      - name: story_spec
+        source: context
+        context_key: story_spec
+    outputs:
+      - name: review_verdict
+        type: string
+      - name: review_findings
+        type: string
+      # s3-convergence-signal: boolean convergence signal. Consumed by the
+      # loop skip_when predicate to short-circuit subsequent rounds.
+      - name: review_passed
+        type: json
+    timeout_ms: 300000
+
+  # #16 (t-006): bounded converge-loop — replaces the needs_revision hard-halt
+  # (max_attempts: 1). The LOOP primitive iterates the review↔fix sub-graph
+  # until review_verdict is not needs_revision OR max_rounds is exhausted,
+  # then returns the last output without hard-failing (t-005 ceiling semantics).
+  - id: review-converge-loop
+    node_type: loop
+    loop_config:
+      sub_graph: review-fix-cycle
+      gate_predicate: "review_verdict not equals needs_revision"
+      max_rounds: 3
+      feature: review_converge
+      convergence_signal: review_passed
     depends_on:
       - review
     inputs:
@@ -625,6 +761,59 @@ steps:
         source: step_output
         step_id: review
         output_name: review_verdict
+    outputs:
+      - name: last_output
+        type: json
+      - name: review_verdict
+        type: string
+      - name: review_passed
+        type: json
+
+  # ── Terminal safety gate (prod bug #26): after the bounded converge-loop, a
+  # final verdict that is neither passed NOR needs_optimization must BLOCK
+  # integrate — bounded retries do not license silent integration of an
+  # unresolved (needs_revision) review. Single-shot (max_attempts: 1) —
+  # re-evaluating an unchanged verdict just fails identically.
+  # review-converge-loop surfaces the last successful round's verdict and
+  # review_passed signal. The grammar gate reads the boolean signal while the
+  # handler validates the paired verdict, so a loop that revises
+  # needs_revision → passed (or → needs_optimization) may integrate and
+  # needs_revision alone blocks.
+  #
+  # s2-needs-optimization-passes-gate: needs_optimization is Hive's own
+  # non-blocking verdict (nits/suggestions, not defects) and SATISFIES this
+  # gate exactly like passed; only needs_revision (or a missing/malformed
+  # signal) blocks. Pass-set is exactly {passed, needs_optimization} — see
+  # gate.py's _PASS_VERDICTS.
+  - id: gate-review
+    node_type: gate
+    # Terminal safety gate (prod bug #26 + the ph-8/ph-9 silent-pass bug).
+    # Grammar-valid boolean gate. GateHandler validates the paired
+    # review_verdict/review_passed outputs before evaluating this predicate:
+    # review_passed must be true iff review_verdict is passed OR
+    # needs_optimization, preserving the fail-closed policy without adding
+    # string literals to the predicate grammar.
+    gate: "$review-converge-loop.output.review_passed == true"
+    retry:
+      max_attempts: 1
+      on: gate_failed
+      retry_node: review
+    depends_on:
+      - review-converge-loop
+    # C4: single-upstream (post-unroll the loop's last round is still a
+    # single dep) twin of codex-review's `when:` above — without it, an
+    # empty-domain story's skipped review chain still lets gate-review
+    # attempt its predicate against never-materialised loop output.
+    when: "$test.output.test_artifacts != null"
+    inputs:
+      - name: review_verdict
+        source: step_output
+        step_id: review-converge-loop
+        output_name: review_verdict
+      - name: review_passed
+        source: step_output
+        step_id: review-converge-loop
+        output_name: review_passed
     outputs:
       - name: gate_passed
         type: json
@@ -642,6 +831,7 @@ steps:
       - review
       - codex-review
       - dev-standby
+      - review-converge-loop
       - gate-review
     inputs:
       - name: backend_implementation
@@ -656,7 +846,7 @@ steps:
         optional: true
       - name: review_verdict
         source: step_output
-        step_id: review
+        step_id: review-converge-loop
         output_name: review_verdict
       - name: codex_verdict
         source: step_output
@@ -693,6 +883,10 @@ steps:
       so it can be addressed before the story is considered complete.
     depends_on:
       - integrate
+    # C4: single-upstream twin of codex-review's `when:` above — `integrate`
+    # SKIPping (multi-upstream trigger_rule, once its own upstreams are
+    # properly gated) still falls through to RUN here without this.
+    when: "$test.output.test_artifacts != null"
     inputs:
       - name: backend_implementation
         source: step_output

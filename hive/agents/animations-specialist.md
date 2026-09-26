@@ -1,7 +1,7 @@
 ---
 name: animations-specialist
 description: "Implements and optimizes animations, transitions, and motion design across CSS, native, and web platforms."
-model: sonnet
+model: claude-sonnet-5
 color: blue
 knowledge:
   - path: ~/.claude/hive/memories/animations-specialist/

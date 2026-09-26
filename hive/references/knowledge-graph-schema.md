@@ -26,6 +26,12 @@ The L2 knowledge graph stores structured decisions and lifecycle events as subje
 | `blocked_by` | Records a blocking dependency between two work items |
 | `depends_on` | Records a soft dependency between two work items |
 
+### Learning Predicates
+
+| Predicate | Description |
+|-----------|-------------|
+| `insight` | Records a durable, reusable learning distilled from an agent's completed work (subject is `<epic>:<story>`, not an actor — distinct from `decided`, which records a deliberate choice made by an actor) |
+
 ### Lifecycle Predicates
 
 | Predicate | Description |
@@ -123,7 +129,7 @@ SELECT 1 FROM predicates WHERE predicate = ?
 ```
 Unknown predicates are rejected immediately with an error naming the invalid predicate:
 ```
-Error: unknown predicate "my-custom-predicate" — must be one of: decided, superseded, assigned_to, blocked_by, depends_on, phase_started, phase_complete, phase_failed, phase_blocked, phase_handoff, validated, tested, implemented
+Error: unknown predicate "my-custom-predicate" — must be one of: decided, superseded, assigned_to, blocked_by, depends_on, insight, phase_started, phase_complete, phase_failed, phase_blocked, phase_handoff, validated, tested, implemented
 ```
 
 **Atomicity:** All triples in a single kg_write() call are written in a WAL transaction:
@@ -192,6 +198,7 @@ CREATE TABLE IF NOT EXISTS triples (
 CREATE TABLE IF NOT EXISTS predicates (predicate TEXT PRIMARY KEY);
 INSERT OR IGNORE INTO predicates VALUES
   ('decided'), ('superseded'), ('assigned_to'), ('blocked_by'), ('depends_on'),
+  ('insight'),
   ('phase_started'), ('phase_complete'), ('phase_failed'), ('phase_blocked'),
   ('phase_handoff'),
   ('validated'), ('tested'), ('implemented');

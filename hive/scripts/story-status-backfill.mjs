@@ -132,12 +132,19 @@ async function emitKgTriple(epic_id, story_id, old_status, new_status) {
 const all = deriveAllStatuses({ repo_root: REPO_ROOT });
 const candidates = all.filter(r => r.stale && (!EPIC_FILTER || r.epic_id === EPIC_FILTER));
 
-// No-downgrade guard: a terminal YAML status (shipped / complete / completed)
-// is operator- or /ship-owned and must never be rewritten back to a
-// non-terminal derived status. Marker gaps (e.g. Multica runs that never wrote
-// terminal markers) would otherwise clobber accurate release records — the
-// failure mode that produced the bogus reconcile PR after v2.11.0.
-const TERMINAL_YAML = new Set(['shipped', 'complete', 'completed']);
+// No-downgrade guard: a terminal YAML status is operator- or /ship-owned and
+// must never be rewritten back to a non-terminal derived status. Marker gaps
+// (e.g. Multica/PLU runs that never wrote terminal episode markers) would
+// otherwise clobber accurate release records — the failure mode that produced
+// the bogus reconcile PR after v2.11.0, and again for visual-plan-enrichment
+// after v2.13.4.
+//
+// `done` is the non-canonical terminal word emitted by the PLU/Multica track
+// (canonical Hive vocab is complete/completed/shipped). It is treated as
+// terminal here so PLU-sourced stories are protected the same way before /ship
+// canonicalizes them — without this, every marker-less `done` story reverts to
+// pending on the next merge.
+const TERMINAL_YAML = new Set(['shipped', 'complete', 'completed', 'done']);
 const TERMINAL_DERIVED = new Set(['shipped', 'completed']);
 const guarded = candidates.filter(
   r => TERMINAL_YAML.has(r.yaml_status) && !TERMINAL_DERIVED.has(r.derived_status)

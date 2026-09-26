@@ -1,0 +1,44 @@
+name: Promote dev to main
+# On every push/merge to `dev`, open (or reuse) a single dev -> default-branch PR.
+# Idempotent: never opens a duplicate while one is already open.
+# CI (ci.yml) gates that PR; the final merge to the default branch is handled by
+# the existing review squad (see report). Auto-merge is intentionally NOT enabled
+# here so the test gate is never bypassed by the GITHUB_TOKEN (which cannot trigger
+# CI on bot-opened PRs).
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Open or update dev -> default-branch PR
+        run: |
+          set -e
+          BASE=$(gh api "repos/$GH_REPO" -q .default_branch)
+          if [ "$BASE" = "dev" ]; then
+            echo "Default branch is 'dev' — nothing to promote."; exit 0
+          fi
+          AHEAD=$(gh api "repos/$GH_REPO/compare/$BASE...dev" -q .ahead_by)
+          if [ "$AHEAD" = "0" ] || [ -z "$AHEAD" ]; then
+            echo "dev is not ahead of $BASE — nothing to promote."; exit 0
+          fi
+          EXISTING=$(gh pr list --base "$BASE" --head dev --state open --json number -q '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING (dev -> $BASE) already open — leaving it for the review squad."
+            exit 0
+          fi
+          TITLE="Promote: dev -> $BASE"
+          BODY="Automated promotion PR opened by promote.yml on push to dev ($AHEAD commit(s) ahead). CI gates this merge; final merge is handled by the review squad."
+          gh pr create --base "$BASE" --head dev --title "$TITLE" --body "$BODY" \
+            || gh pr create --base "$BASE" --head dev --title "$TITLE" --body "$BODY"
+          echo "Opened dev -> $BASE promotion PR."

@@ -1,6 +1,6 @@
 ---
 name: planning-routing
-description: Assemble and route a planning persona team across Multica, direct TeamCreate, and Codex-backed agent-spawn paths. Inherits the caller's model and execution context.
+description: Assemble and route a planning persona team across Multica, direct auto-spawn, and Codex-backed agent-spawn paths. Inherits the caller's model and execution context.
 ---
 
 # Hive Planning Routing
@@ -20,8 +20,8 @@ Do not call it again after successful teammate creation unless abandoning the pr
 
 **Side effects:** emits exactly one INFO log line per persona at final spawn
 decision; calls `plan-mode-cc-workflows` for CC-Workflows-routed personas;
-invokes the DAG front door (`hive.lib.dag_executor.run`) for Multica-routed personas; calls `TeamCreate`
-for direct-routed personas; calls `agent-spawn` -> `codex-invoke` for
+invokes the DAG front door (`hive.lib.dag_executor.run`) for Multica-routed personas; auto-spawns
+direct-routed personas via natural-language team description; calls `agent-spawn` -> `codex-invoke` for
 Codex-routed personas.
 
 INFO log requested field uses planning-routing vocabulary:
@@ -76,7 +76,7 @@ Produce `routing_decisions` with one value per persona: `multica`, `codex`, or
 - When `agent_backends[persona] == codex` and persona is supported, route `codex` with reason `no-fallback-needed`.
 - When `agent_backends[persona] == codex` and persona is known-incompatible, route `direct` with reason `known-incompatible`.
 - When `agent_backends[persona] == codex` and persona is in neither list, route `direct` with reason `unvalidated-persona`.
-- When `agent_backends[persona] == claude`, route `direct` with reason `claude-requested` (configured Claude personas use the direct TeamCreate path; the value `claude` is canonical per hive.config.yaml `Supported backends: claude | codex`).
+- When `agent_backends[persona] == claude`, route `direct` with reason `claude-requested` (configured Claude personas use the direct auto-spawn path; the value `claude` is canonical per hive.config.yaml `Supported backends: claude | codex`).
 - When `agent_backends[persona]` is unset or `agent_backends` is absent, route `direct` with reason `agent_backends-unset`.
 
 Apply this only to personas present in the assembled list. `ui-designer` is always `direct` even when configured to `codex`, because codex-invoke marks it known-incompatible. Step 0.2 does not emit INFO logs.
@@ -115,12 +115,12 @@ Use `routing_decisions` to assemble one conceptual planning team:
   H/V, structured-outline sign-off) and MUST present and wait at them locally
   after the graph completes. Do not also create local teammates for a
   multica-routed persona unless DAG fallback is triggered.
-- **Direct path (`TeamCreate`):** collect every persona routed `direct` and create them in one `TeamCreate` call. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
+- **Direct path (natural-language auto-spawn):** collect every persona routed `direct` and describe each as a named teammate; the runtime materializes them automatically. Parallel dispatch is the default for eligible teammate sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. Use Step 0.4 and include only direct-routed personas in `## Team Members`.
 - **Codex path (`agent-spawn` -> `codex-invoke`):** for each persona routed `codex`, create a separate persistent-pane teammate through `agent-spawn`, passing full persona context, resolved paths, memory loading context, and the same planning-team coordination context direct teammates receive.
 
 Mixed teams are valid. Some planning personas may come from
 `plan-mode-cc-workflows`, some from the DAG front-door path (plan graph), some
-from `TeamCreate`, and others from `agent-spawn` -> `codex-invoke`; they are
+from the direct auto-spawn path, and others from `agent-spawn` -> `codex-invoke`; they are
 still one planning team. The caller remains coordinator and uses `SendMessage`
 for assignments and review loops where local teammate handles exist, and uses the
 `plan-mode-cc-workflows` summaries and episode markers for CC-Workflows-produced
@@ -131,7 +131,7 @@ Step 0.5 handles a runtime Multica or Codex failure, update that persona's resul
 to the fallback outcome instead of adding a second line.
 
 Preserve the 4-field template exactly:
-- `[info] planning routing: persona={X} requested={cc-workflows|multica|codex|direct|unset} path={plan-mode-cc-workflows|dag-plan-graph|codex-invoke|TeamCreate} reason={reason}`
+- `[info] planning routing: persona={X} requested={cc-workflows|multica|codex|direct|unset} path={plan-mode-cc-workflows|dag-plan-graph|codex-invoke|auto-spawn} reason={reason}`
 
 Valid `reason=` values:
 - `no-fallback-needed`
@@ -149,12 +149,12 @@ Examples:
 - `[info] planning routing: persona=researcher requested=cc-workflows path=codex-invoke reason=cc-workflows-precondition-failed: claude-version-too-low`
 - `[info] planning routing: persona=researcher requested=multica path=dag-plan-graph reason=no-fallback-needed`
 - `[info] planning routing: persona=researcher requested=multica path=codex-invoke reason=multica-daemon-down: ECONNREFUSED`
-- `[info] planning routing: persona=ui-designer requested=multica path=TeamCreate reason=multica-daemon-down: ECONNREFUSED`
+- `[info] planning routing: persona=ui-designer requested=multica path=auto-spawn reason=multica-daemon-down: ECONNREFUSED`
 - `[info] planning routing: persona=technical-writer requested=codex path=codex-invoke reason=no-fallback-needed`
-- `[info] planning routing: persona=ui-designer requested=codex path=TeamCreate reason=known-incompatible`
-- `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=unvalidated-persona`
-- `[info] planning routing: persona={X} requested=direct path=TeamCreate reason=no-fallback-needed`
-- `[info] planning routing: persona={X} requested=unset path=TeamCreate reason=agent_backends-unset`
+- `[info] planning routing: persona=ui-designer requested=codex path=auto-spawn reason=known-incompatible`
+- `[info] planning routing: persona={X} requested=codex path=auto-spawn reason=unvalidated-persona`
+- `[info] planning routing: persona={X} requested=direct path=auto-spawn reason=no-fallback-needed`
+- `[info] planning routing: persona={X} requested=unset path=auto-spawn reason=agent_backends-unset`
 
 Return `spawn_outcome` with all active direct and Codex teammate handles plus
 the CC-Workflows and Multica dispatch summaries and per-persona episode marker
@@ -162,48 +162,59 @@ paths for CC-Workflows-routed and Multica-routed personas. The caller does not
 need to know which local backend produced a handle before assigning normal
 planning work.
 
-### Step 0.4: Mixed-Team TeamCreate Prompt Template
+### Step 0.4: Per-Persona Direct Auto-Spawn Prompts
 
-Render this `TeamCreate` prompt for the direct path only, from `requirement_summary`, `assembled_personas`, and `routing_decisions`. The caller may provide `{caller_phase_label}` for traceability; this skill does not hardcode `/plan` phase references.
+Describe each direct-routed persona as its OWN named teammate; render a scoped team prompt per persona. Do NOT render one combined prompt
+listing every persona — render one scoped prompt per direct persona. Each
+per-persona prompt carries only that persona's role and context, plus a separate
+roster/coordination block naming the rest of the planning team. Build each from
+`requirement_summary`, `assembled_personas`, and `routing_decisions`. The caller
+may provide `{caller_phase_label}` for traceability; this skill does not hardcode
+`/plan` phase references.
+
+Render this per-persona prompt once per direct-routed persona, substituting that
+persona's single role line (drop the other role lines) and listing the remaining
+team members in the roster:
 
 ```text
-Create a planning team for requirement: "{requirement_summary}"
+You are joining a planning team for requirement: "{requirement_summary}"
 
-## Team Members
+## Your role (this teammate only)
+[exactly one role line below — the one matching {persona}]
 
-[include only personas whose routing_decisions entry is direct]
-
-**researcher** - Explore the target codebase. Read persona from hive/agents/researcher.md.
+researcher - Explore the target codebase. Read persona from hive/agents/researcher.md.
 Load memories from the agent's knowledge paths. Gather raw findings: file paths, patterns, constraints, risks.
 
-**technical-writer** - Produce formatted planning documents. Read persona from hive/agents/technical-writer.md.
+technical-writer - Produce formatted planning documents. Read persona from hive/agents/technical-writer.md.
 Load memories from the agent's knowledge paths. Transform raw findings into research briefs, design discussions, H/V plans, structured outlines.
 
-**tpm** - Sequence delivery planning. Read persona from hive/agents/tpm.md.
+tpm - Sequence delivery planning. Read persona from hive/agents/tpm.md.
 Load memories from the agent's knowledge paths. Own horizontal/vertical thinking. Review all documents for delivery feasibility.
 
-[if architect is in the assembled list and routed direct]
-**architect** - Evaluate technical feasibility. Read persona from hive/agents/architect.md.
+architect - Evaluate technical feasibility. Read persona from hive/agents/architect.md.
 Load memories from the agent's knowledge paths. Review designs for architectural soundness.
 
-[if ui-designer is in the assembled list and routed direct]
-**ui-designer** - Produce wireframes and review UI aspects. Read persona from hive/agents/ui-designer.md.
+ui-designer - Produce wireframes and review UI aspects. Read persona from hive/agents/ui-designer.md.
 Load memories from the agent's knowledge paths. Scan existing design language before proposing new UI.
 
-## Coordination
-- Orchestrator assigns work via SendMessage
-- All agents review documents before user presentation (collaborative review gate)
-- Each agent reads their full persona file and loads their memory directory
-- Use agent-spawn skill patterns: load full persona, resolve paths, load memories
+## Team roster & coordination
+- Your teammates on this planning team: {the other assembled personas, by name}.
+- Orchestrator assigns work via SendMessage.
+- All agents review documents before user presentation (collaborative review gate).
+- Read your full persona file and load your memory directory.
+- Use agent-spawn skill patterns: load full persona, resolve paths, load memories.
 ```
 
-If the team is mixed, the `TeamCreate` prompt includes only direct-routed personas.
+Describe one named teammate per direct-routed persona — each prompt
+includes only that persona's role line and names the other team members in the
+roster. Personas routed to other paths (Codex, Multica, CC-Workflows) are named
+in the roster for coordination but are NOT auto-spawned here.
 Codex-routed personas participate via separate panes and read team context from
 their own `agent-spawn` prompt. Multica-routed personas participate through the DAG front door
 (`hive.lib.dag_executor.run` + `plan.workflow.yaml`) and receive the planning
 context via the `context.requirement` field passed to the graph.
 
-**Agent-spawn compliance:** Every codex-routed teammate must follow `skills/hive/skills/agent-spawn/SKILL.md` patterns: full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. Direct `TeamCreate` teammates still read their persona files and load knowledge paths on startup.
+**Agent-spawn compliance:** Every codex-routed teammate must follow `skills/hive/skills/agent-spawn/SKILL.md` patterns: full persona injection, path resolution (`~`, `${CLAUDE_PLUGIN_ROOT}`), memory loading, domain constraints, and required tool validation. Direct auto-spawn teammates still read their persona files and load knowledge paths on startup.
 
 ### Step 0.5: Runtime Fallback
 
@@ -221,12 +232,11 @@ missing), handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
 2. Re-route each affected persona to Codex when that persona is supported by
-   `codex-invoke` and not known-incompatible; otherwise re-route it to direct
-   `TeamCreate`.
+   `codex-invoke` and not known-incompatible; otherwise re-route it to direct auto-spawn.
 3. If the Codex fallback for an affected persona also fails, apply the Codex
-   fallback rules below and end at direct `TeamCreate`.
+   fallback rules below and end at direct auto-spawn.
 4. Update the Step 0.3 INFO log outcome for each affected persona:
-   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|TeamCreate} reason=cc-workflows-precondition-failed: {error}`
+   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|auto-spawn} reason=cc-workflows-precondition-failed: {error}`
    where `{error}` is truncated to 120 chars and reflects the
    `field_sources` citation from the structured precondition_failed payload.
 5. Continue the planning flow.
@@ -237,11 +247,10 @@ missing, agent failed terminal status, episode marker write failed), handle it
 gracefully:
 
 1. Do not hard-fail planning-team assembly.
-2. Re-route the failed persona to Codex when supported, otherwise direct
-   `TeamCreate`.
+2. Re-route the failed persona to Codex when supported, otherwise direct auto-spawn.
 3. If the Codex fallback also fails, apply the Codex fallback rules below.
 4. Update the Step 0.3 INFO log outcome for that persona:
-   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|TeamCreate} reason=cc-workflows-dispatch-failed: {error}`
+   `[info] planning routing: persona={X} requested=cc-workflows path={codex-invoke|auto-spawn} reason=cc-workflows-dispatch-failed: {error}`
    where `{error}` is truncated to 120 chars.
 5. Continue the planning flow.
 
@@ -252,12 +261,11 @@ error during `binding=multica` init), handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
 2. Re-route each affected persona to Codex when that persona is supported by
-   `codex-invoke` and not known-incompatible; otherwise re-route it to direct
-   `TeamCreate`.
+   `codex-invoke` and not known-incompatible; otherwise re-route it to direct auto-spawn.
 3. If the Codex fallback for an affected persona also fails, apply the Codex
-   fallback rules below and end at direct `TeamCreate`.
+   fallback rules below and end at direct auto-spawn.
 4. Update the Step 0.3 INFO log outcome for each affected persona:
-   `[info] planning routing: persona={X} requested=multica path={codex-invoke|TeamCreate} reason=multica-daemon-down: {error}`
+   `[info] planning routing: persona={X} requested=multica path={codex-invoke|auto-spawn} reason=multica-daemon-down: {error}`
    where `{error}` is truncated to 120 chars.
 5. Continue the planning flow.
 
@@ -266,23 +274,22 @@ after reaching the daemon (graph step error, node timeout, or executor error),
 handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
-2. Re-route the failed persona to Codex when supported, otherwise direct
-   `TeamCreate`.
+2. Re-route the failed persona to Codex when supported, otherwise direct auto-spawn.
 3. If the Codex fallback also fails, apply the Codex fallback rules below.
 4. Update the Step 0.3 INFO log outcome for that persona:
-   `[info] planning routing: persona={X} requested=multica path={codex-invoke|TeamCreate} reason=multica-dispatch-failed: {error}`
+   `[info] planning routing: persona={X} requested=multica path={codex-invoke|auto-spawn} reason=multica-dispatch-failed: {error}`
    where `{error}` is truncated to 120 chars.
 5. Continue the planning flow.
 
 If `codex-invoke` dispatch FAILS at runtime for any persona (Codex CLI missing, auth expired, cmux pane creation error, pre-flight failure, timeout, or any error returned from `agent-spawn`/`codex-invoke`), handle it gracefully:
 
 1. Do not hard-fail planning-team assembly.
-2. Re-route the failed persona to direct `TeamCreate` in a follow-up call. Re-compose the prompt to add the failed persona, or use `SendMessage` to instruct existing TeamCreate teammates to adopt the re-routed teammate.
+2. Re-route the failed persona to direct auto-spawn in a follow-up call. Re-compose the prompt to add the failed persona, or use `SendMessage` to instruct existing named teammates to adopt the re-routed teammate.
 3. Update the Step 0.3 INFO log outcome for that persona:
-   `[info] planning routing: persona={X} requested=codex path=TeamCreate reason=codex-dispatch-failed: {error}`
+   `[info] planning routing: persona={X} requested=codex path=auto-spawn reason=codex-dispatch-failed: {error}`
    where `{error}` is truncated to 120 chars.
 4. Continue the planning flow.
 
-If the orchestrator observes repeated Codex failures (>=3 within one planning invocation), it MAY skip remaining Codex-routed personas for the invocation. Route skipped personas through `TeamCreate`, emit their per-persona INFO logs, and set reason `codex-dispatch-failed: circuit breaker`.
+If the orchestrator observes repeated Codex failures (>=3 within one planning invocation), it MAY skip remaining Codex-routed personas for the invocation. Route skipped personas through direct auto-spawn, emit their per-persona INFO logs, and set reason `codex-dispatch-failed: circuit breaker`.
 
 Every planning-persona spawn, success or fallback, must emit exactly one structured INFO log line per persona at the final spawn decision point. Do not skip the INFO log or collapse multiple persona routings into one line.

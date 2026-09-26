@@ -31,11 +31,11 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 | Scope | Tool | Why |
 |---|---|---|
-| **Parallelizing stories across the epic** | `TeamCreate` or cmux panes | Stories run in separate tmux panes via `TeamCreate`, or separate cmux panes when `execution.terminal_mux: cmux` |
+| **Parallelizing stories across the epic** | Natural-language team description or cmux panes | Stories run as named teammates described in the team prompt — one teammate per story — or in separate cmux panes when `execution.terminal_mux: cmux`. Parallel teammates are the default for eligible story sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. |
 | **Sequential workflow steps within a single story** | `Agent` | Steps within a teammate's pane run inline — this is correct |
-| **Specialist phase teams (pre-exec, post-exec)** | `TeamCreate` | Specialist teams are independent coordination units |
+| **Specialist phase teams (pre-exec, post-exec)** | Natural-language team description | Specialist teams are independent coordination units — describe each as a named teammate in the team prompt |
 
-**Using `Agent` to execute stories is a protocol violation.** `Agent` is only correct for workflow steps *within* an already-spawned teammate. If the orchestrator finds itself about to call `Agent` with a story's worth of work, it MUST use `TeamCreate` instead.
+Describe each story as a named teammate in the team prompt; the runtime materializes teammates automatically. Sequential execution remains available through `execution.parallel_teams: false` or `--sequential`.
 
 ## Process
 
@@ -80,6 +80,20 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
    6. Proceed to step 2 (cycle state) as normal.
 
+1b. **Reconciliation gate (auto-firing, story `wr-6-plan-drift-instrument`).** Read the loaded epic's `depends_on_epic:` and `planned_base_ref:` fields (`hive/references/story-yaml-schema.md` § 6.5). This gate REQUIRES a reconciliation artifact when the epic's dependency has moved since planning — it does not hard-block; it is a warn-then-require, same posture as the wr-1 completion-record detector.
+
+   Compute the gate decision by invoking `hive.lib.plan_drift.check_reconciliation_required(epic_dict, cwd=<repo root>)` (Python — charter C1: marker/validator logic lives in Python, not inline shell). This returns a dict with `required: bool` and `reason:` one of `not-tracked`, `legacy-non-sha-placeholder`, `cannot-resolve`, `base-unchanged`, `base-moved`.
+
+   - **`required: false`** (any of `not-tracked` / `legacy-non-sha-placeholder` / `cannot-resolve` / `base-unchanged`): proceed silently to step 2. `cannot-resolve` fails open — a broken git state must never block execute — but emit `[warn] step 1b: plan-drift check could not resolve current ref — skipping gate` so the failure-open path is visible in logs, not silent.
+   - **`required: true`** (`base-moved`): before proceeding to story 1 (i.e. before step 4's topological sort begins any story), require `${HIVE_STATE_DIR}/epics/{epic-id}/reconciliation.md` to exist (template: `hive/references/reconciliation-artifact-template.md`).
+     - If it already exists (a prior run reconciled this exact `planned_base_ref` -> `current_base_ref` transition), read its `## Deltas` section and proceed — do not re-require.
+     - If it does not exist, emit:
+       ```
+       [warn] step 1b: {epic-id} depends_on_epic={depends_on_epic} — base moved since planning (planned_base_ref={planned_base_ref}, current={current_base_ref}). Reconciliation artifact required before story 1.
+       ```
+       and produce the artifact: for each delta the dependency's actual delivery introduces versus what `/plan` assumed, record `{planned, actual, stories_touched}` per the template. Zero deltas is valid — write the artifact with an empty `## Deltas` list rather than skip it, so the gate has evidence reconciliation ran.
+     - Once the artifact exists (freshly written or pre-existing), count its `## Deltas` entries and call `hive.lib.plan_drift.emit_plan_drift(run_id, epic_id, delta_count)` to record the plan-drift metric (`hive/references/metrics-event.schema.md` — `plan_drift_delta_count`), then proceed to step 2.
+
 2. **Load or create cycle state.** Check `${HIVE_STATE_DIR}/cycle-state/{epic-id}.yaml`. If it doesn't exist, create a minimal one with `epic_id` and `created` timestamp. The cycle state accumulates decisions across phases — see `hive/references/cycle-state-schema.md`. Include the cycle state in all downstream agent prompts as system-level constraints.
 
 2b. **Read and partition escalations.** Inspect the `escalations:` field of the loaded cycle state.
@@ -115,6 +129,14 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
    - `pre_exec[]`, `post_exec[]`, and `appends[]` are built in memory but not yet consumed. Downstream stories add consumption logic.
    - If a trigger's `responds_with.id` does not resolve to an existing agent file (`hive/agents/{id}.md`) or team config (`${HIVE_STATE_DIR}/teams/{id}.yaml`): log `[warn] step 2b: responds_with.id "{id}" — referenced agent/team file not found on disk — continuing` and continue.
 
+2c. **xhigh-effort audit escalation.** Read `${HIVE_STATE_DIR}/session-effort.txt` (see `hive/references/configuration.md` — Effort & Context Adaptation). This file holds one of `low | medium | high | xhigh`, written by `hooks/effort-gate.sh`.
+
+   - **Effort == `xhigh`:** if `pre_exec[]` does not already contain a record for trigger `security:plan-audit` (i.e. it was not already raised by a real escalation in step 2b), synthesize one in memory — `{trigger: security:plan-audit, placement: pre-exec, severity: xhigh-forced, stories: [], reason: "xhigh effort escalation", raised_by: effort-gate, raised_at: now}` — and append it to `pre_exec[]`. This reuses the existing `security:plan-audit` catalog entry (`hive/references/specialist-triggers.md`) and its bound `hive/workflows/security-audit.workflow.yaml` runner — no bespoke audit runner is introduced. Emit:
+     ```
+     [info] step 2c: effort=xhigh — forcing security:plan-audit into pre-exec specialist phase loop
+     ```
+   - **Effort == `medium` / `high` / `low`, or the file is absent/unreadable:** this gate is a no-op — `pre_exec[]` passes through unchanged from step 2b. Never force audits below `xhigh`.
+
 3. **Load the workflow definition.** Based on the `--methodology` parameter (default: `classic`), load:
    ```
    hive/workflows/development.{methodology}.workflow.yaml
@@ -125,14 +147,14 @@ If the kickoff checks pass, proceed silently. Only surface kickoff-related outpu
 
 4a. **Pre-exec phase loop.** If `pre_exec[]` is empty, skip this step entirely — zero behavior change for escalation-free epics.
 
-   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `TeamCreate` per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
+   > **Parallel-call-site annotation (audit pass):** `parallel_rationale: bounded-slice` — each specialist team writes to a declared phase-output directory at `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. The loop iterates triggers sequentially (one `Agent(name:)` call per trigger), so this is *not* story-level fan-out and is out-of-scope for the `ed-7` parallel gate; catalogued in [`hive/references/parallel-call-sites.md`](../../hive/references/parallel-call-sites.md) §3 (`execute:specialist-phases`). The annotation also applies to the symmetric post-exec loop in step 7a below.
 
    For each trigger in `pre_exec[]`, ordered by `raised_at` ASC (severity DESC as tiebreak), look up the trigger's catalog entry in `hive/references/specialist-triggers.md` (loaded in step 2b) to resolve `responds_with.id` and `workflow` fields. Then apply the three-condition branch:
 
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] pre-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If `TeamCreate` errors: log the failure (e.g., `[error] pre-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `Agent(name:)` with the team config and workflow fields from the trigger's catalog entry. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/` (where `{trigger}` is the trigger ID string, e.g., `security:plan-audit`). If the `Agent(name:)` call errors: log the failure (e.g., `[error] pre-exec: Agent(name:) failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] pre-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -164,11 +186,11 @@ If the target graph file does not exist, report an error and list available grap
 **DAG front-door invocation.** For each story in `unblocked_stories[]`:
 
 ```python
-from hive.lib.dag_executor.run import run
+from hive.lib.dag_executor.run import run, resolve_spawn_binding
 
 result = run(
     workflow_path,        # resolved methodology graph above
-    binding="multica",
+    binding=resolve_spawn_binding(flow="execution")[0],
     context={
         "epic_id": epic_id,
         "story_id": story.id,
@@ -185,6 +207,8 @@ Emit one INFO log line at dispatch:
 
 Graph completion is an **artifact-readiness signal only** — not a per-story done signal. Per-story completion tracking (episode markers, `completed`/`failed` sets) remains the orchestrator's responsibility per the episode-schema contract.
 
+Completion here is a convention, not a gate: no tool boundary lets a hook intercept the orchestrator writing a story's files, so `/execute` cannot structurally refuse an incomplete completion. The standard record it converges on (episode markers per step, OR a schema-conformant cycle-state persona_dispatch+verdict block) is a **documented expectation**, not an enforced one. `hive/lib/completion_record_detector.py`, wired to SubagentStop/Stop via `hooks/completion-record-detect.sh`, is the DETECTOR half of that contract: it inspects the current epic/story post-hoc and WARNS loudly when the standard record is missing or malformed — including when an epic has no cycle-state file at all. It never blocks.
+
 **Depth advancement.** Collect story results and proceed to step 6g (depth-advancement loop) with `completed`/`failed` sets populated from `result`.
 
 **Fallback.** If the Multica binding fails:
@@ -194,7 +218,7 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
 
 **Local fallback (backend unset).** When `mode_decision != multica`, this step is skipped entirely. Existing paths (sessions → 6c, team-cmux → 6b, team → 6, sequential → 7, sandcastle → 6d, cc-workflows → 6f) are unchanged — no regression.
 
-6. **Agent team execution.** Follow **`references/team-execution.md`** for the full TeamCreate prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
+6. **Agent team execution.** Follow **`references/team-execution.md`** for the full `Agent(name:)` prompt template, per-story commit pattern, sidecar injection for append-placement triggers, and respawn monitoring.
 
 6b. **Agent team execution (cmux path).** Use this path when all four step-5 conditions are true and `execution.terminal_mux` resolves to `cmux`.
    Invoke `skills/hive/skills/execute-mode-team-cmux/SKILL.md` with:
@@ -202,9 +226,9 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
    - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
    - `appends_map`: the review-phase sidecar map from step 2b
    - `epic_handle`: the current epic identifier
-   See `references/team-execution.md` for cmux-variant TeamCreate prompt details.
+   See `references/team-execution.md` for cmux-variant `Agent(name:)` prompt details.
 
-6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the TeamCreate path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
+6c. **Session-based execution** (used when `HIVE_SESSIONS_ENABLED` or `sessions.enabled: true`). Replaces the `Agent(name:)` path with the Claude Agent SDK `/v1/sessions` API for story-level execution.
    Invoke `skills/hive/skills/execute-mode-session/SKILL.md` with:
    - `workflow_path`: the workflow loaded in step 3
    - `unblocked_stories[]`: the depth-0 ready stories from the topological sort
@@ -270,7 +294,7 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
    **Prerequisite — team_memory_path validation:** Before spawning, verify the team config's `team_memory_path` directory exists on disk. If it does not, emit an actionable error — e.g., `[error] post-exec: team_memory_path "${HIVE_STATE_DIR}/team-memories/security-team/" does not exist — create it before running specialist phases` — skip the trigger, and continue. Do not crash execute.
 
    **(i) workflow field set AND workflow file exists on disk:**
-   Invoke `TeamCreate(team_config=team_yaml, workflow=entry.workflow)`. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. If `TeamCreate` errors: log the failure (e.g., `[error] post-exec: TeamCreate failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
+   Invoke `Agent(name:)` with the team config and workflow fields from the trigger's catalog entry. Write phase output to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/`. If the `Agent(name:)` call errors: log the failure (e.g., `[error] post-exec: Agent(name:) failed for {trigger-id} — {error}`), write a failure marker to `${HIVE_STATE_DIR}/specialist-phases/{trigger}/{epic-id}/failure.md`, and continue to the next trigger. Do not crash execute.
 
    **(ii) workflow field set AND workflow file MISSING from disk:**
    Log `[info] post-exec: specialist workflow not yet built — skipping {trigger-id}` → no-op. Continue to next trigger.
@@ -430,19 +454,34 @@ Graph completion is an **artifact-readiness signal only** — not a per-story do
 
 8. After step 6g exits with `next_unblocked` empty AND `in-flight` empty, produce summary + audit + PR:
 
-   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h):
+   0. **Epic PR.** If `task_tracking.adapter` does not own PR creation AND `failed` is empty (full-pass run), open one PR per the branch + worktree + PR convention (step 6h) — but first check whether a dispatched background agent already opened one.
+
+      **Adopt-if-exists check (bg Auto-PR).** A story dispatched via `--bg`/`--background` (Multica or sessions binding) may have already opened its own draft PR under its own account and be auto-fixing CI on it. Hive must not create a second PR for the same branch. Before creating, query for an existing open PR on the epic's head branch:
 
       ```sh
-      gh pr create \
-        --base ${epic.git_flow.base_branch:-develop} \
-        --head ${epic.git_flow.branch:-feat/<epic-id>} \
-        --title "feat(<epic-id>): <epic.title>" \
-        --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+      existing_pr=$(gh pr list \
+        --head "${epic.git_flow.branch:-feat/<epic-id>}" \
+        --state open \
+        --json url,number,isDraft \
+        --jq '.[0]')
       ```
 
-      Capture the returned PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open and surface unreachable downstream stories per step 6g's partial-epic verdict.
+      - **If `existing_pr` is non-empty:** skip creation — do not run `gh pr create`. Adopt the found PR's `url`/`number` as this epic's PR record (this is what step 8's story tracker/PR linkage points at). Log `[info] finalize: existing PR #<number> (draft=<isDraft>) found on <branch> — adopting, skipping Hive PR creation`.
+      - **If `existing_pr` is empty:** create as before:
 
-   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened one.
+        ```sh
+        gh pr create \
+          --base ${epic.git_flow.base_branch:-develop} \
+          --head ${epic.git_flow.branch:-feat/<epic-id>} \
+          --title "feat(<epic-id>): <epic.title>" \
+          --body "Closes epic <epic-id>. Stories: <comma-list of completed story-ids>."
+        ```
+
+        **Race guard — idempotent on create-conflict.** A bg agent can open its PR in the window between the check above and this create call. If `gh pr create` fails with a "already exists" error (`GraphQL: A pull request already exists for <owner>:<branch>`), do not treat this as a run failure — re-run the `gh pr list` query above and adopt the now-existing PR instead, using the same log line as the adopt branch.
+
+      Capture the returned or adopted PR URL in the run summary. If `failed` is non-empty (partial-epic), skip PR open/adopt and surface unreachable downstream stories per step 6g's partial-epic verdict.
+
+   1. **Run summary** — existing behavior: list completed stories, any failed/blocked, and final status. Include PR URL when step 8.0 opened or adopted one.
 
    2. **Post-run audit** — scan this run's resolved state per `hive/references/gate-lift-telemetry.md`:
       - `gate_lift_fired` (true if step 1 took the warning branch and synthesized an ad-hoc plan)
@@ -507,7 +546,7 @@ greenfield/early projects and logs once per run. No new error handling
 
 ## Key References
 
-- **`references/team-execution.md`** — TeamCreate prompt template, sidecar injection, per-story commits, respawn monitoring
+- **`references/team-execution.md`** — `Agent(name:)` prompt template, sidecar injection, per-story commits, respawn monitoring
 - **`references/sequential-execution.md`** — Per-story workflow steps, sidecar injection at review, episode records, gate checks
 - `hive/references/agent-teams-guide.md` — Team mechanics and limitations
 - `hive/references/methodology-routing.md` — Methodology selection

@@ -1,8 +1,10 @@
 import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 const HTTP_TIMEOUT_MS = 30_000;
 const USER_AGENT = 'hive-multica-story-dispatch/0.1.0';
 const SQUAD_OUTCOME_VALUES = new Set(['action', 'no_action', 'failed']);
+const MULTICA_RUNTIME_PREFIX = 'multica:';
 // Safety bound on timeline pagination so a misbehaving/looping API can never
 // spin forever. 50 pages is far beyond any realistic issue timeline length.
 const MAX_TIMELINE_PAGES = 50;
@@ -43,6 +45,11 @@ function normalizeList(body, key) {
   return [];
 }
 
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): this REST+Bearer wire is not MCP transport, but it is audited
+// to the same stateless bar — every call below is a fresh per-request fetch.
+// Do NOT add an `Mcp-Session-Id` header, a cookie jar, or any sticky-routing
+// header/state here. See README.md "Stateless MCP compat note".
 async function httpJson(url, opts = {}) {
   const { method = 'GET', token, body } = opts;
   const headers = { Accept: 'application/json', 'User-Agent': USER_AGENT };
@@ -145,6 +152,40 @@ export function __resetCache() {
   AGENT_CACHE.clear();
 }
 
+// OpenAI-compatible direct-HTTP backends (openai-compat-backend.mjs). These are
+// the runner-agnostic sibling of the direct `codex` subprocess tier: instead of
+// dispatching to a Multica runtime, the caller shells the story/review prompt to
+// an OpenAI-compatible /chat/completions endpoint (OpenRouter for Kimi K3 & 300+
+// models; Google's OpenAI-compat surface for Gemini via our paid GEMINI_API_KEY).
+// Token grammar: 'gemini' | 'gemini:<model>' | 'openrouter:<model>' | 'kimi' alias.
+const OPENAI_COMPAT_ALIASES = { kimi: 'openrouter:moonshotai/kimi-k3', 'kimi-k3': 'openrouter:moonshotai/kimi-k3' };
+function isOpenAICompatBackend(s) {
+  return s === 'gemini' || s.startsWith('gemini:') || s.startsWith('openrouter:');
+}
+
+// Normalize a raw agent_backends entry to a canonical backend token.
+// 'opencode' is a convenience alias for 'multica:opencode'.
+// 'kimi'/'kimi-k3' alias to 'openrouter:moonshotai/kimi-k3'.
+// Returns one of: 'claude' | 'codex' | 'multica:<runtime>'
+//                 | 'gemini' | 'gemini:<model>' | 'openrouter:<model>'
+// Unknown or absent values fall back to 'claude'.
+function resolveBackend(rawBackend) {
+  if (rawBackend == null) return 'claude';
+  let s = String(rawBackend).trim();
+  if (OPENAI_COMPAT_ALIASES[s]) s = OPENAI_COMPAT_ALIASES[s];
+  if (s === 'opencode') return `${MULTICA_RUNTIME_PREFIX}opencode`;
+  if (s === 'claude' || s === 'codex' || s.startsWith(MULTICA_RUNTIME_PREFIX)) return s;
+  if (isOpenAICompatBackend(s)) return s;
+  return 'claude';
+}
+
+// Exported resolution helper: look up a persona in agent_backends and return
+// its canonical backend token. Use this in tests and in callers that need the
+// resolved value without going through the full brief-serialization path.
+export function resolvePersonaBackend(persona, agentBackends = {}) {
+  return resolveBackend(agentBackends?.[persona]);
+}
+
 function resolveCodexInstruction(options) {
   const { codexInstruction = false, dispatchingPersona, agents, agentBackends } = options;
   if (dispatchingPersona !== undefined && dispatchingPersona !== null) {
@@ -153,7 +194,7 @@ function resolveCodexInstruction(options) {
       : null;
     const effectiveProvider = entry?.provider ?? 'claude';
     if (effectiveProvider === 'codex') return false;
-    return agentBackends?.[dispatchingPersona] === 'codex';
+    return resolveBackend(agentBackends?.[dispatchingPersona]) === 'codex';
   }
   return codexInstruction;
 }
@@ -165,10 +206,55 @@ function shQuoteRef(ref) {
   return `'${String(ref).replace(/'/g, "'\\''")}'`;
 }
 
+// Render the "single shared branch" integration contract that tells a dispatched
+// agent to check out the epic branch (instead of the daemon's throwaway
+// agent/<task> branch) and push its commits back so the next story in the
+// dependency chain builds on real prior work. Exported so the dispatch CLI can
+// inject it into an existing issue body that predates the contract (e.g. issues
+// filed by /plan Phase D before integrationBranch was known).
+export function renderIntegrationContract(branch, storyId = null) {
+  const qBranch = shQuoteRef(branch);
+  const sid = storyId ?? '<story-id>';
+  return [
+    `## Integration Contract — single shared branch`,
+    ``,
+    `Work directly on \`${branch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
+    ``,
+    `**First action (overrides daemon checkout):**`,
+    '```sh',
+    `git fetch origin ${qBranch}`,
+    `git checkout ${qBranch}`,
+    `git reset --hard origin/${qBranch}`,
+    '```',
+    ``,
+    `**After completing all acceptance criteria:**`,
+    '```sh',
+    `git add <specific files for this story>`,
+    `git commit -m "[${sid}] <type>(<scope>): <description>"`,
+    `# fetch + rebase to handle peer dispatches landing concurrently`,
+    `git fetch origin ${qBranch}`,
+    `git rebase origin/${qBranch}`,
+    `git push origin HEAD:${qBranch}`,
+    '```',
+    ``,
+    `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
+    ``,
+    `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
+  ].join('\n');
+}
+
 export function serializeStoryBrief(story, options = {}) {
-  const { integrationBranch = null } = options;
+  const { integrationBranch = null, priorExperienceSection = null, dispatchingPersona = null } = options;
   const showCodexInstruction = resolveCodexInstruction(options);
   const sections = [];
+
+  // Machine-readable persona stamp (locked decision #1) — lets downstream
+  // harvest (S2) attribute memories to the dispatched persona without a
+  // daemon-agent-name reverse-lookup. HTML comment keeps it out of the
+  // rendered issue view.
+  if (dispatchingPersona) {
+    sections.push(`<!-- persona: ${dispatchingPersona} -->`);
+  }
 
   if (story?.description) {
     sections.push(`## Goal\n${cleanText(story.description)}`);
@@ -196,6 +282,10 @@ export function serializeStoryBrief(story, options = {}) {
     sections.push(`## References\n${story.references.map(formatReference).join('\n')}`);
   }
 
+  if (priorExperienceSection) {
+    sections.push(priorExperienceSection.trim());
+  }
+
   sections.push(
     [
       `## Insight Capture`,
@@ -206,35 +296,7 @@ export function serializeStoryBrief(story, options = {}) {
   );
 
   if (integrationBranch) {
-    const qBranch = shQuoteRef(integrationBranch);
-    sections.push(
-      [
-        `## Integration Contract — single shared branch`,
-        ``,
-        `Work directly on \`${integrationBranch}\` (the epic branch). Do NOT use the daemon's auto-created \`agent/developer/<task>\` worktree branch as your commit target.`,
-        ``,
-        `**First action (overrides daemon checkout):**`,
-        '```sh',
-        `git fetch origin ${qBranch}`,
-        `git checkout ${qBranch}`,
-        `git reset --hard origin/${qBranch}`,
-        '```',
-        ``,
-        `**After completing all acceptance criteria:**`,
-        '```sh',
-        `git add <specific files for this story>`,
-        `git commit -m "[${story?.id ?? '<story-id>'}] <type>(<scope>): <description>"`,
-        `# fetch + rebase to handle peer dispatches landing concurrently`,
-        `git fetch origin ${qBranch}`,
-        `git rebase origin/${qBranch}`,
-        `git push origin HEAD:${qBranch}`,
-        '```',
-        ``,
-        `**If push rejected (non-fast-forward):** re-run \`git fetch + git rebase + git push\`. Retry up to 3 times. If conflict on rebase, STOP and post the conflict diff as a comment — this means the parallel-dispatch gate let an overlapping story through and orchestrator must adjudicate.`,
-        ``,
-        `**Final comment on this issue MUST include:** commit SHA(s) you pushed.`,
-      ].join('\n'),
-    );
+    sections.push(renderIntegrationContract(integrationBranch, story?.id ?? null));
   }
 
   sections.push(
@@ -242,6 +304,55 @@ export function serializeStoryBrief(story, options = {}) {
   );
 
   return `${sections.join('\n\n')}\n`;
+}
+
+const MEMORY_BRIEF_TIMEOUT_MS = 10_000;
+// fileURLToPath (not .pathname) so this survives on a repo checked out under
+// a path containing spaces or other percent-encoded characters.
+const MEMORY_BRIEF_SCRIPT_PATH = fileURLToPath(new URL('../memory_brief.py', import.meta.url));
+
+// Bridge glue only (Python-first policy, .pHive/proposals/language-strategy-adr.md):
+// shell to hive/lib/memory_brief.py and hand back its stdout verbatim. No
+// memory selection, ranking, or budget logic lives here — that is entirely
+// in the Python module.
+export async function fetchPriorExperienceSection(persona, epic, storyId, options = {}) {
+  if (!persona) return null;
+  const { tokenBudget, pythonBin = 'python3', query = null } = options;
+
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const execAsync = promisify(execFile);
+
+  const args = [MEMORY_BRIEF_SCRIPT_PATH, '--persona', persona];
+  if (epic) args.push('--epic', epic);
+  if (storyId) args.push('--story', storyId);
+  if (query) args.push('--query', query);
+  if (tokenBudget) args.push('--token-budget', String(tokenBudget));
+
+  try {
+    const { stdout } = await execAsync(pythonBin, args, { timeout: MEMORY_BRIEF_TIMEOUT_MS });
+    const trimmed = stdout.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  } catch {
+    // Prior-experience injection is advisory — a missing interpreter, absent
+    // memory stores, or a KG read failure must never block dispatch.
+    return null;
+  }
+}
+
+// Compose the story brief with the (best-effort) Prior Experience section.
+// This is the seam story spec calls `buildStoryBrief`: it wraps the pure,
+// synchronous serializeStoryBrief with the one async, best-effort step
+// (shelling to Python for prior-experience memories).
+export async function buildStoryBrief(story, options = {}) {
+  const storyQuery = [story?.title, story?.description].filter(Boolean).join(' \u2014 ');
+  const priorExperienceSection = await fetchPriorExperienceSection(
+    options.dispatchingPersona,
+    story?.epic,
+    story?.id,
+    { tokenBudget: options.memoryTokenBudget, pythonBin: options.pythonBin, query: storyQuery },
+  );
+  return serializeStoryBrief(story, { ...options, priorExperienceSection });
 }
 
 export async function resolveAgentUuidByName(serverUrl, token, workspaceId, agentName) {
@@ -290,6 +401,21 @@ export async function dispatchStoryToAgent(serverUrl, token, workspaceId, issueU
     method: 'PUT',
     token,
     body: { assignee_type: 'agent', assignee_id: agentUuid },
+  });
+}
+
+// Reset a spent issue (one whose only task is terminal) back to a clean,
+// dispatchable state so the daemon spawns a FRESH run on the next assignment.
+// Without this, re-PUTting the same assignee on a done issue is a no-op: the
+// daemon sees no actionable transition and `readTaskSnapshot` keeps returning
+// the stale terminal task — a silent "already done" that masquerades as success.
+// We clear the assignee AND move the issue to `todo`, producing a clear
+// unassign→reassign transition the daemon can act on.
+export async function resetIssueForRerun(serverUrl, token, workspaceId, issueUuid) {
+  return httpJson(issueUrl(serverUrl, workspaceId, issueUuid), {
+    method: 'PUT',
+    token,
+    body: { assignee_type: null, assignee_id: null, status: 'todo' },
   });
 }
 
@@ -347,7 +473,7 @@ export async function dispatchStoryToPersonas(
       resolvedAgents.length > 0
         ? resolvedAgents
         : AGENT_CACHE.get(cacheKey(serverUrl, workspaceId, token)) ?? [];
-    const brief = serializeStoryBrief(story, {
+    const brief = await buildStoryBrief(story, {
       dispatchingPersona: persona,
       agents: briefAgents,
       agentBackends,
@@ -563,15 +689,19 @@ async function findIssueByTitle(serverUrl, token, workspaceId, titleKey) {
 // When `dedupTitle` is provided, lists existing issues first and returns any matching
 // one instead of creating a duplicate (server-side idempotency guard for cross-machine
 // resume). Returns {id, url, ...} from the API response.
-export async function createIssue(serverUrl, token, workspaceId, title, description, { dedupTitle = null } = {}) {
+export async function createIssue(serverUrl, token, workspaceId, title, description, { dedupTitle = null, integrationBranch = null } = {}) {
   if (dedupTitle) {
     const existing = await findIssueByTitle(serverUrl, token, workspaceId, dedupTitle);
     if (existing?.id) return existing;
   }
+  const body = { title, description };
+  // Bind the issue to the epic's shared integration branch (structured field the
+  // daemon reads to key branch-shared worktree reuse — NOT just the body contract).
+  if (integrationBranch) body.integration_branch = String(integrationBranch);
   const created = await httpJson(issuesCreateUrl(serverUrl, workspaceId), {
     method: 'POST',
     token,
-    body: { title, description },
+    body,
   });
   return created;
 }

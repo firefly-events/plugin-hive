@@ -96,6 +96,15 @@ def test_must_equal_fails_on_mismatch():
         )
 
 
+def test_must_equal_blocks_needs_optimization():
+    with pytest.raises(GateFailedError):
+        GateHandler().handle(
+            _gate_node("review_verdict must equal passed"),
+            inputs={"review_verdict": "needs_optimization"},
+            run_id="rid-1",
+        )
+
+
 def test_must_not_equal_blocks_named_value():
     """A needs_revision review must not silently integrate (#16)."""
     with pytest.raises(GateFailedError):
@@ -107,7 +116,7 @@ def test_must_not_equal_blocks_named_value():
 
 
 def test_must_not_equal_passes_other_verdicts():
-    """passed and needs_optimization both proceed past the gate."""
+    """Legacy generic negated predicates retain their narrow semantics."""
     handler = GateHandler()
     for verdict in ("passed", "needs_optimization"):
         out = handler.handle(

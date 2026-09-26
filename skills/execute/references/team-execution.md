@@ -2,54 +2,81 @@
 
 > `${HIVE_STATE_DIR}` resolves from `paths.state_dir` in the ROOT `hive.config.yaml` at runtime (not from the shipped baseline `hive/hive.config.yaml`). Default: `.pHive`.
 >
-> **Parallel-dispatch gate (ed-7):** `TeamCreate` (this section) and the cmux variant (below) are two of the four in-scope dispatch points for the parallel gate. Each story listed in the prompt must already carry the `parallel_allowed: true` + `parallel_rationale ∈ {variation, read-only, bounded-slice}` pair emitted by `/plan` Phase C step 13, with `bounded-slice` stories declaring disjoint `files_to_modify[]`. The gate runs in `execute-dispatch` Step 1.5 *before* this section's prompt is generated — by the time you arrive here, the depth-0 `unblocked_stories[]` set has already been validated and `mode_decision` was downgraded to `sequential` on any violation. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the catalog of in-scope sites.
+> **Parallel-dispatch gate (ed-7):** `Agent(name:)` (this section) and the cmux variant (below) are two of the four in-scope dispatch points for the parallel gate. Each story listed in the prompt must already carry the `parallel_allowed: true` + `parallel_rationale ∈ {variation, read-only, bounded-slice}` pair emitted by `/plan` Phase C step 13, with `bounded-slice` stories declaring disjoint `files_to_modify[]`. The gate runs in `execute-dispatch` Step 1.5 *before* this section's prompt is generated — by the time you arrive here, the depth-0 `unblocked_stories[]` set has already been validated and `mode_decision` was downgraded to `sequential` on any violation. See [`hive/references/parallel-call-sites.md`](../../../hive/references/parallel-call-sites.md) §2 for the catalog of in-scope sites.
 
-Use the `TeamCreate` tool to spawn an agent team. Generate a natural-language team creation prompt that describes the epic and its tasks:
+Describe each story as a named teammate in the team prompt — one teammate per story, each carrying ONLY that story's scope. Never combine two or more stories into a single teammate's scope description. The runtime materializes teammates automatically from the natural-language team description; parallel execution is the default for eligible story sets; `execution.parallel_teams: false` or `--sequential` forces sequential execution. Generate a natural-language prompt per story that describes that single story's task:
 
 ```
-Create a team to execute the "{epic-id}" epic.
+Execute story "{story-id}" of the "{epic-id}" epic.
 
-## Tasks
+## Scope (this teammate, this story only)
+You own exactly one story: {story-id}. Do NOT read, start, or execute any
+other story. Read the story at
+${HIVE_STATE_DIR}/epics/{epic-id}/stories/{story-id}.yaml and execute the
+steps described.
 
-**Task: {story-id}** (no dependencies — can start immediately)
-Read the story at ${HIVE_STATE_DIR}/epics/{epic-id}/stories/{story-id}.yaml
-and execute the steps described. Write episode records to
-${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/.
+## Dependencies & context
+[If no depends_on:] No dependencies — start immediately.
+[If depends_on present:] Depends on: {dep-1}, {dep-2}. Wait until all
+dependencies complete before starting this story.
 
-**Task: {dependent-story-id}** (depends on: {dep-1}, {dep-2})
-Wait until all dependencies complete, then read and execute the story.
-Write episodes to ${HIVE_STATE_DIR}/episodes/{epic-id}/{dependent-story-id}/.
+## Workflow
+Follow the development workflow phases from the loaded methodology
+(e.g., research -> implement -> test -> review -> integrate).
 
-## Workflow per task
-Each task follows the development workflow phases from the loaded
-methodology (e.g., research -> implement -> test -> review -> integrate).
+## Completion & reporting
+Write episode records after each step to
+${HIVE_STATE_DIR}/episodes/{epic-id}/{story-id}/. When this story
+completes, report back.
 
-## Coordination
-Write episode records after each step. When all tasks complete, report back.
+## Completion Contract
+Before you finish, as your LAST action, run exactly one of:
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" success
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" failure
+Use "success" only if every acceptance criterion for this task was met and
+all required tests pass. Use "failure" otherwise. A missing marker is always
+read downstream as failure, never success — so skipping this step silently
+fails the story even if your work was correct.
 ```
 
-Rules for generating the prompt:
-- Each story becomes one task. Use the story ID as the task name.
-- Stories with no `depends_on` are listed as "can start immediately."
-- Stories with dependencies list them explicitly so the team blocks correctly.
-- Do NOT inline the full story content — each teammate reads their story YAML file directly.
-- For large epics (10+ stories), keep task descriptions minimal (ID + title + deps only).
+Rules for generating each per-story prompt:
+- Emit exactly one prompt per story, addressed to that single story only — never name a second story's scope inside a teammate's prompt. Use the story ID as the teammate name.
+- Stories with no `depends_on` say "start immediately"; stories with dependencies list them explicitly so the teammate blocks correctly.
+- Do NOT inline the full story content — each teammate reads its own story YAML file directly.
+- For large epics (10+ stories), keep each prompt minimal (ID + title + deps only) — but still one scoped prompt per story.
+- The `## Completion Contract` block above is REQUIRED in every teammate prompt this template emits (tmux/`Agent(name:)` team dispatch is a `SubagentStop`-bound path — see `hive/references/completion-contract.md`). Emit it verbatim, byte-identical to the canonical block in that file. This is the only path the wr-5 investigation found delivering named-teammate prompts with the contract silently absent — do not drop it in future edits to this template.
 
-## Sidecar injection (append-placement triggers)
+## Skill binding resolution (match-resolve-load-invoke)
+
+Each teammate's per-story prompt above says "Follow the development workflow phases from the loaded methodology" — that phrase carries the same obligation as sequential execution's step **b-0**: `skills/execute/references/sequential-execution.md` §b-0 defines the one shared match-resolve-load-invoke contract (`hive.lib.skill_binding.resolve_skill_binding`). When a workflow phase's agent persona (e.g. `hive/agents/reviewer.md` for the `review` phase) declares a matching `skills:` binding, the teammate resolves and loads that skill as the governing procedure for that phase — a frontmatter entry alone does not satisfy this. Team execution does not re-implement its own resolver; it defers to the same seam so sequential, team, and DAG entry paths cannot silently diverge. A binding that is declared but unreadable fails that phase closed, same as sequential execution.
+
+## Sidecar injection (placement-aware)
 
 After building each story's task block, check if that story's ID is present in the story→sidecar_agents map (populated in step 2b from `appends[]` records).
 
+**Placement determines the step a sidecar attaches to — it is NOT uniform.** A sidecar's placement comes from its trigger's catalog `responds_with` (step 2b): an **append/review-placement** agent participates in the `review` step; an **advisor-placement** agent (the implementation sidecar, e.g. `pair-programmer`) participates in the `implement` step and is **never** attached to review. Routing every sidecar into review would violate the advisor's implementation-only, never-gating contract (`skills/observe/SKILL.md` "What this skill is NOT"; sequential-execution.md **b-ii**). Team mode must mirror the sequential split, not collapse it.
+
 - If the story ID is **not** in the map: the task block is emitted byte-for-byte as described above — no changes.
-- If the story ID **is** in the map: append the following to that story's task block (one line-pair per agent in the list):
+- If the story ID **is** in the map, append **per agent, keyed by placement**:
 
-  ```
-  Also spawn {agent-name} as a sidecar for the review step.
-  {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
-  ```
+  - **Review-placement (append) agents** → attach to the review step:
 
-- Epics with no `appends[]` entries produce a TeamCreate prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
+    ```
+    Also spawn {agent-name} as a sidecar for the review step.
+    {agent-name} reads hive/agents/{agent-name}.md and participates in code review.
+    ```
 
-> **Pattern note:** This is the Agent-within-TeamCreate pattern — sidecar runs within the dev team pane, not as a separate team.
+  - **Advisor-placement agents** (e.g. `pair-programmer`) → attach to the implement step as a **distinct advisor instance**, using the same shared resolver as sequential **b-ii** (`resolve_skill_binding("hive/agents/{agent-name}.md", "advising during an implementation-sidecar session")` → `skills/observe/SKILL.md`):
+
+    ```
+    Also spawn {agent-name} as an implementation-sidecar advisor for the implement step ONLY.
+    {agent-name} reads hive/agents/{agent-name}.md, loads skills/observe/SKILL.md as its governing procedure, and gives advisory-only feedback.
+    It is a DISTINCT instance from the developer and from the later reviewer. Its output is advisory only — it MUST NOT gate, block, produce a change_verdict, or be reused as/influence the reviewer instance for this story.
+    ```
+
+- Epics with no `appends[]` entries produce a story prompt that is byte-for-byte identical to pre-sidecar behavior — this is the primary constraint.
+
+> **Pattern note:** This is the sidecar-within-named-teammate pattern — sidecar runs within the dev teammate's pane, not as a separate `Agent(name:)` call.
 
 ## Per-Story Commits
 
@@ -71,7 +98,7 @@ Ensure `${HIVE_STATE_DIR}/respawn-summaries/` exists before epic execution begin
 
 When active: `execution.terminal_mux` resolves to `cmux` (explicit setting, or `auto` with cmux detected).
 
-Dispatch: instead of a single `TeamCreate` call, the orchestrator loops through stories.
+Dispatch: same as the auto-spawn path — the orchestrator loops through stories — but delivers each story prompt to a cmux pane via agent-spawn instead.
 
 - Topologically sorted stories with no unmet dependencies are spawned immediately.
 - Each spawn goes through the agent-spawn skill (section 7.3), which opens a cmux pane, launches `claude` in interactive mode, and delivers the prompt.
@@ -83,31 +110,51 @@ Tracking map:
 {story_id: {surface_id, status: pending|active|complete|failed, depends_on: [...]}}
 ```
 
-Poll loop (replaces TeamCreate's internal monitoring):
+Poll loop (replaces `Agent(name:)`'s internal monitoring):
 
 ```
 Every 10 seconds:
   for each active surface:
-    cmux read-screen --surface <id> --scrollback
-    - Search output for [STORY-COMPLETE:{story-id}]
-    - Persist last-read line count per surface to avoid reprocessing
-    - If marker found: mark complete, check dependents
-    - If surface.health fails: mark failed, capture scrollback, log error
+    - First check for the s1 SubagentStop marker:
+      ${HIVE_STATE_DIR}/agent-complete/<agent_id>/complete.json
+      If present: mark complete/failed per its `verdict`, check dependents,
+      and skip the scrollback scan for this surface this tick.
+      (wr-5: cmux panes launch `claude` in an interactive terminal pane, not
+      via the `Agent` tool, so `SubagentStop` does not bind here in practice —
+      this check is a defensive fast path in case that ever changes, not a
+      relied-upon signal. The scrollback scan below is the real completion
+      source for cmux and must not be removed.)
+    - Otherwise (no marker yet — event-driven completion supersedes the
+      timer for Agent(name:)-dispatched work, but the scan stays as the
+      bounded fallback so a hook failure or crashed agent can't hang the
+      loop): cmux read-screen --surface <id> --scrollback
+      - Search output for [STORY-COMPLETE:{story-id}]
+      - Persist last-read line count per surface to avoid reprocessing
+      - If marker found: mark complete, check dependents
+      - If surface.health fails: mark failed, capture scrollback, log error
 ```
+
+**Carve-out (do NOT try to fix):** a story dispatched via Bash `run_in_background` has no completion hook in this runtime — `SubagentStop` never fires for it, so no `complete.json` is ever written. Tracking for a Bash-bg story MUST keep using the scrollback scan (or an equivalent poll) unconditionally; only `Agent(name:)`/cmux `Agent(name:)`-dispatched work is eligible for the marker fast path above.
 
 Dependency unblocking: when `story-a` completes, scan the tracking map for stories whose `depends_on` lists are now fully satisfied, then spawn those stories.
 
 Messaging: the orchestrator can send messages to any active pane.
 
 - Respawn signal: `cmux send --surface <id> "Your context is degrading. Write a respawn summary to ${HIVE_STATE_DIR}/respawn-summaries/{story-id}.md and exit."`
-- Sidecar injection: `cmux send --surface <id> "Also spawn {agent-name} as a sidecar for the review step. Read hive/agents/{agent-name}.md."`
+- Sidecar injection is placement-aware here too. Prefer appending the matching
+  instruction from **Sidecar injection (placement-aware)** to the per-story
+  prompt before spawn. If a sidecar is discovered only after the pane starts,
+  send exactly the placement-matching instruction: review-placement agents go
+  to the review step; advisor-placement agents go to the implement step ONLY
+  as a distinct advisor instance. Never send a generic review-sidecar command
+  for an advisor-placement agent.
 
 Completion marker convention: agents must emit `[STORY-COMPLETE:{story-id}]` as the last line of their workflow output. Add this to the per-story prompt template.
 
 Cleanup: after all stories complete, close all surfaces: `cmux close-surface --surface <id>` for each tracked surface.
 
-Sidecar injection: same logic as the TeamCreate variant. Check the story→sidecar_agents map and append sidecar instructions to the story prompt before spawn.
+Sidecar injection: same placement-keyed logic as the `Agent(name:)` variant. Check the story→sidecar_agents map and append the matching review-placement or advisor-placement instruction to the story prompt before spawn.
 
-Per-story commits: same as the TeamCreate variant. Stories commit independently on feature branches.
+Per-story commits: same as the `Agent(name:)` variant. Stories commit independently on feature branches.
 
 Respawn monitoring: same detection heuristics, but use `surface.send_text` for the respawn signal and `surface.read_text` plus `surface.health` for monitoring and liveness.

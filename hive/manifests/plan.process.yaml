@@ -1,0 +1,219 @@
+id: plan
+name: Planning Workflow
+description: >
+  Decomposes a requirement into a committed epic with dependency-tracked
+  stories. Shape: research ‖ design → design-gate → author → user gates
+  (hv-gate ‖ so-gate) → reconcile → output-validation.
+  User-facing review gates suspend on the hive-dag path; the default
+  orchestrator-narrated path handles gating inline inside skills/plan/SKILL.md.
+version: "1.0"
+
+steps:
+  # ── Phase A: research (runs in parallel with design) ────────────────────────
+  - id: research
+    role: researcher
+    label: Codebase research
+    description: >
+      Gather existing context, prior decisions, and domain knowledge needed
+      to ground the design discussion.
+    node_type: agent
+    depends_on: []
+    outputs:
+      - name: research_brief
+        type: string
+    retry:
+      max_attempts: 3
+      on: agent_failed
+    timeout_ms: 1800000
+
+  # ── Phase B: design discussion (runs in parallel with research) ──────────────
+  - id: design
+    role: architect
+    label: Design discussion
+    description: >
+      Explore architectural approaches and trade-offs in parallel with
+      the research pass.
+    node_type: agent
+    depends_on: []
+    outputs:
+      - name: design_discussion
+        type: string
+    retry:
+      max_attempts: 3
+      on: agent_failed
+    timeout_ms: 1800000
+
+  # ── Phase B.5: design user-gate (always-halt) ────────────────────────────────
+  - id: design-gate
+    role: architect
+    label: Design review gate
+    description: >
+      Always-halt gate. Design runs parallel to research so it cannot
+      carry a trustworthy confidence score; human review is required before
+      authoring can begin. Also guards against an already-doomed research
+      path reaching suspend state.
+    node_type: user_gate
+    depends_on:
+      - design
+      - research
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase C: story decomposition + epic authoring ───────────────────────────
+  - id: author
+    role: technical-writer
+    label: Story decomposition and epic authoring
+    description: >
+      Decomposes the approved design into stories and commits the epic
+      directory to the feature branch.
+    node_type: agent
+    depends_on:
+      - research
+      - design-gate
+    outputs:
+      - name: epic_dir
+        type: string
+      - name: commit_sha
+        type: string
+      - name: branch
+        type: string
+      - name: repo
+        type: string
+      - name: work_dir
+        type: string
+    retry:
+      max_attempts: 4
+      on: agent_failed
+    timeout_ms: 3600000
+
+  # ── Phase C.5: H/V signal producer (confidence-scored) ─────────────────────
+  - id: hv
+    role: technical-writer
+    label: Horizontal/Vertical planning signal
+    description: >
+      Evaluates the committed epic and emits a confidence score for
+      horizontal and vertical planning coverage.
+    node_type: agent
+    depends_on:
+      - author
+    outputs:
+      - name: confidence
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.6: H/V user-gate (confidence-scored) ───────────────────────────
+  - id: hv-gate
+    role: technical-writer
+    label: H/V planning gate
+    description: >
+      Auto-passes on a repeat run when confidence is 80 or higher.
+      Otherwise suspends for human review.
+    node_type: user_gate
+    auto_pass_when: "$hv.output.first_run == false && $hv.output.confidence >= 80"
+    depends_on:
+      - hv
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
+  # ── Phase C.7: SO signal producer (open-questions-driven) ──────────────────
+  - id: so
+    role: technical-writer
+    label: Structured outline open-questions signal
+    description: >
+      Counts open questions remaining after authoring to determine whether
+      a structured outline pass is needed.
+    node_type: agent
+    depends_on:
+      - author
+    outputs:
+      - name: open_questions
+        type: json
+      - name: open_questions_count
+        type: json
+      - name: first_run
+        type: json
+    timeout_ms: 1800000
+
+  # ── Phase C.8: SO user-gate (open-questions-driven) ────────────────────────
+  - id: so-gate
+    role: technical-writer
+    label: Structured outline gate
+    description: >
+      Auto-passes on a repeat run when all open questions are resolved.
+      Otherwise suspends for structured outline review.
+    node_type: user_gate
+    auto_pass_when: "$so.output.first_run == false && $so.output.open_questions_count == 0"
+    depends_on:
+      - so
+    outputs:
+      - name: gate_verdict
+        type: string
+    timeout_ms: 1800000
+
+  # ── Reconcile: materialise author's committed work ───────────────────────────
+  - id: reconcile
+    role: reconcile-handler
+    label: Reconcile committed work
+    description: >
+      Fast-forward merges the committed epic branch so that the
+      output-validation gate sees the final state.
+    node_type: reconcile
+    depends_on:
+      - hv-gate
+      - so-gate
+    outputs:
+      - name: reconcile_status
+        type: string
+    timeout_ms: 120000
+
+  # ── Output-validation gate ────────────────────────────────────────────────────
+  - id: output-validation
+    role: researcher
+    label: Output schema validation
+    description: >
+      Schema-validates the committed epic directory. A non-empty but
+      schema-invalid epic fails here (hard stop).
+    node_type: gate
+    gate: "epic_dir must be valid plan-epic"
+    depends_on:
+      - reconcile
+    outputs:
+      - name: validation_result
+        type: string
+    timeout_ms: 60000
+
+# ── Adapters ─────────────────────────────────────────────────────────────────
+#
+# Each adapter maps a substrate to the concrete executor for this workflow.
+# A non-CC executor (Codex, direct API, etc.) reads this section to enumerate
+# what adapters exist and determine whether it has a native path.
+#
+adapters:
+  # Default path: inline orchestrator-narrated execution inside the CC skill.
+  default:
+    type: cc-skill
+    skill: skills/plan/SKILL.md
+
+  # Multica substrate: each step dispatched as a separate Multica agent task.
+  multica:
+    type: cc-skill
+    skill: skills/hive/skills/plan-mode-multica/SKILL.md
+
+  # CC Workflows substrate: each step dispatched via CC Workflows API.
+  cc-workflows:
+    type: cc-skill
+    skill: skills/hive/skills/plan-mode-cc-workflows/SKILL.md
+
+  # hive-dag executor: runs the step graph natively from the workflow YAML.
+  # The workflow YAML and this manifest share the same logical step graph;
+  # the YAML carries the hive-dag-specific execution fields (step_file refs,
+  # executor-graduated opt-in).
+  hive-dag:
+    type: dag-workflow
+    workflow: hive/workflows/plan.workflow.yaml

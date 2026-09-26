@@ -61,6 +61,57 @@ steps:
     optional: false
     timeout_ms: 600000
 
+  # s7-testswarm-rounds-loop: configurable multi-round swarm loop.
+  # When loops.test_swarm.enabled=true (opt-in; default disabled — swarm is
+  # expensive), the generate→assess body is unrolled up to max_rounds times.
+  # Convergence signal: coverage_satisfied (bool json). Ceiling exit: all rounds
+  # run when never satisfied; no mandatory terminal hard-block.
+  - id: swarm-rounds-loop
+    agent: ""
+    node_type: loop
+    loop_config:
+      sub_graph: swarm-rounds
+      gate_predicate: "coverage satisfied"
+      max_rounds: 3
+      feature: test_swarm
+      convergence_signal: coverage_satisfied
+    depends_on:
+      - verify-baseline
+
+  - id: swarm-generate
+    agent: test-architect
+    sub_graph: swarm-rounds
+    task: >
+      Author test scripts for this swarm round: detect the test framework,
+      write or update test scripts for any uncovered acceptance criteria, and
+      execute tests on the primary platform. Produce updated test files and a
+      structured test manifest for the assess step.
+    depends_on:
+      - verify-baseline
+    outputs:
+      - name: swarm_test_manifest
+        type: string
+
+  - id: swarm-assess
+    agent: test-inspector
+    sub_graph: swarm-rounds
+    task: >
+      Assess whether coverage criteria are satisfied for this swarm round.
+      Compare the test manifest against all acceptance criteria. Emit
+      coverage_satisfied=true when every criterion has at least one passing
+      test and no uncovered gaps remain; emit false to trigger another round
+      (up to max_rounds ceiling).
+    depends_on:
+      - swarm-generate
+    inputs:
+      - name: swarm_test_manifest
+        source: step_output
+        step_id: swarm-generate
+        output_name: swarm_test_manifest
+    outputs:
+      - name: coverage_satisfied
+        type: json
+
   - id: author-tests
     agent: test-architect
     step_file: hive/workflows/steps/test-swarm/step-02-architect.md
@@ -260,6 +311,7 @@ steps:
       - file-bugs
       - triage-failures
       - validate-coverage
+      - swarm-rounds-loop
     inputs:
       - name: platform_a_results
         source: step_output

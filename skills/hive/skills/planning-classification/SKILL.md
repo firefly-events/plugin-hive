@@ -49,7 +49,7 @@ Read `hive/references/specialist-triggers.md`. Extract the `planning_composition
 
 ```yaml
 planning_composition:
-  spine: [researcher, technical-writer, tpm]
+  spine: [researcher, technical-writer, tpm, architect]
   work_types:
     - tag: architecture
       specialists: [architect]
@@ -133,7 +133,7 @@ resolved_roster = spine ∪ { specialists[tag] | tag matched AND gate_decision[t
 ```
 
 Roster ordering (stable):
-1. Spine members first, in catalog order: `researcher`, `technical-writer`, `tpm`.
+1. Spine members first, in catalog order: `researcher`, `technical-writer`, `tpm`, `architect`.
 2. Specialists appended in tag-match order (the order tags appear in the `work_types` list),
    not in order of match strength.
 3. Dedupe: if the same persona appears from multiple tags (e.g. `architect` from both

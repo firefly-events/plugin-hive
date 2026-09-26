@@ -15,12 +15,28 @@ steps:
       or idiomatic findings; those belong to other specialized reviewers.
       Produce a structured findings report.
     depends_on: []
+    config:
+      # Match-resolve-load-invoke seam (hive/lib/skill_binding.py), reused
+      # from s1-code-review-actual-invocation: the AgentHandler resolves this
+      # binding itself before spawning the agent, injects
+      # skills/security-review/SKILL.md into the brief, and sets the
+      # `skill_invoked` output deterministically. Scoped to this step only —
+      # the `synthesis` step below keeps its separate plan-audit verdict
+      # vocabulary (approved/needs_revision/needs_redesign) unchanged.
+      skill_binding:
+        persona_path: hive/agents/security-reviewer.md
+        trigger: "running any security review"
     inputs:
       - name: implementation_artifacts
         source: context
         context_key: implementation_artifacts
     outputs:
       - name: security_critique
+        type: string
+      # s2-security-review-packaging: declared so the AgentHandler's
+      # deterministic skill_invoked write (see config.skill_binding above)
+      # is a real graph output, not merely a step-file-documented convention.
+      - name: skill_invoked
         type: string
     optional: false
     timeout_ms: 900000

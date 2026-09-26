@@ -2,7 +2,7 @@
 # check-agent-misuse.sh — PreToolUse hook for Agent tool
 #
 # Detects when the orchestrator is likely using Agent to execute
-# full stories (should use TeamCreate instead). Checks the Agent
+# full stories (should use Agent(name:) instead). Checks the Agent
 # tool_input.prompt for story-level delegation patterns.
 #
 # Exit codes:
@@ -29,6 +29,18 @@ tool_name=$(echo "$input" | jq -r '.tool_name // ""')
 
 # Only check Agent calls
 if [ "$tool_name" != "Agent" ]; then
+  exit 0
+fi
+
+# Agent called with a `name` is the legitimate orchestrator spawn surface.
+# Allow it — but ONLY when `name` is a non-blank STRING matching a safe teammate-
+# name shape. Whitespace-only, numeric, boolean, or non-string JSON values must
+# NOT trip the early-allow; they fall through to the misuse patterns below.
+agent_name=$(echo "$input" | jq -r 'if (.tool_input.name | type) == "string" then .tool_input.name else "" end')
+# Trim surrounding whitespace before shape-checking.
+agent_name_trimmed="$(printf '%s' "$agent_name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+if [ -n "$agent_name_trimmed" ] \
+  && printf '%s' "$agent_name_trimmed" | grep -qE '^[A-Za-z0-9][A-Za-z0-9_-]*$'; then
   exit 0
 fi
 
@@ -64,11 +76,16 @@ if echo "$prompt" | grep -qiE "$story_regex"; then
   # Check if it's a single story being fully delegated
   story_count=$(echo "$prompt" | grep -oiE "$story_regex" | sort -u | wc -l | tr -d ' ')
   if [ "$story_count" -ge 1 ]; then
-    # Check for workflow execution signals (not just reading a story for context)
-    if echo "$prompt" | grep -qiE '(execute.*stor|implement.*stor|workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
-      echo "BLOCKED: Agent tool used to execute story-level work. Use TeamCreate for story execution." >&2
+    # Check for workflow execution signals (not just reading a story for context).
+    # NOTE: bare `execute.*stor|implement.*stor` was dropped — any story-YAML path
+    # already contains the literal substring "stories/", so those two alternatives
+    # matched on a lone "execute"/"implement" verb plus the path itself, tripping on
+    # legitimate single-step prompts that merely reference a story file. Collapsed
+    # do-everything prompts are still caught by the multi-phase/multi-verb signals
+    # below (workflow+phase, research+implement+test, review+integrate).
+    if echo "$prompt" | grep -qiE '(workflow.*phase|development.*workflow|research.*implement.*test|review.*integrate)'; then
+      echo "BLOCKED: Agent tool used to execute story-level work. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
       echo "Detected $story_count story reference(s) with workflow execution patterns." >&2
-      echo "The orchestrator must delegate stories via TeamCreate, not Agent." >&2
       exit 2
     fi
   fi
@@ -76,8 +93,7 @@ fi
 
 # Pattern 2: Agent prompt contains epic execution language
 if echo "$prompt" | grep -qiE '(execute.*epic|epic.*execution|execute all stories|run the stories)'; then
-  echo "BLOCKED: Agent tool used for epic-level execution. Use TeamCreate instead." >&2
-  echo "The orchestrator delegates epics and stories via TeamCreate, not Agent." >&2
+  echo "BLOCKED: Agent tool used for epic-level execution. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
   exit 2
 fi
 
@@ -87,7 +103,7 @@ fi
 # `Agent` path documented in SKILL.md is "Sequential workflow steps within a
 # single story" — those descriptions name the step, not the whole story.
 if echo "$description" | grep -qiE '(story execution|execute (the )?(entire|full|whole) story|run (the )?(entire|full|whole) story|implement (the )?(entire|full|whole) story|execute all steps)'; then
-  echo "BLOCKED: Agent description indicates whole-story delegation. Use TeamCreate." >&2
+  echo "BLOCKED: Agent description indicates whole-story delegation. Use natural-language teammate spawn instead: describe the team and each teammate's tasks in your prompt" >&2
   exit 2
 fi
 

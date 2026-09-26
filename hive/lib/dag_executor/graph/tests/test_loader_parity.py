@@ -61,9 +61,26 @@ def test_each_workflow_loads_with_nodes(path: Path):
 
 @pytest.mark.parametrize("path", _shipped_workflow_paths(), ids=lambda p: p.name)
 def test_each_workflow_validates(path: Path):
-    """Every shipped workflow must pass the validator."""
+    """Every shipped workflow must pass the validator (post-expand).
+
+    s4-retire-runtime-loop: validate_graph is now a post-expand gate — it
+    rejects any LOOP node that reaches the executor. Workflows that still
+    carry unexpanded LOOP nodes (authoring-only, no `feature` opt-in tag)
+    are valid at the authoring/YAML level but must be expanded before
+    executor validation.
+
+    pr20-fable-review T5: previously an unexpanded-LOOP workflow skipped
+    the WHOLE validator (`pytest.skip`), which hid cycle/dangling-dep
+    defects in the rest of the graph behind the same exemption meant only
+    for the LOOP-runtime-invariant rule. Narrow the exemption to just that
+    one rule via `validate_graph(graph, allow_unexpanded_loop=True)` — every
+    other check (dangling refs, cycles, input sources, output types,
+    timeouts) still runs.
+    """
+    from hive.lib.dag_executor.graph.model import NodeType as _NodeType
     graph = load_workflow(path)
-    validate_graph(graph)
+    loop_nodes = [n for n in graph.nodes.values() if n.node_type == _NodeType.LOOP]
+    validate_graph(graph, allow_unexpanded_loop=bool(loop_nodes))
 
 
 def test_per_step_and_per_input_optional_distinct():

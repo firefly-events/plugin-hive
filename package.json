@@ -2,6 +2,13 @@
   "name": "plugin-hive",
   "private": true,
   "description": "Root dependency manifest for Hive's named Node bridge surfaces.",
+  "scripts": {
+    "approval-server": "node hive/lib/approval/server.mjs",
+    "approval-mcp": "node hive/lib/approval/mcp-server.mjs",
+    "approval-inject-ruleset": "node hive/lib/approval/inject-ruleset.mjs",
+    "test": "node --test \"hive/lib/handoff/__tests__/**/*.test.mjs\" \"hive/lib/multica-story-dispatch/__tests__/**/*.test.mjs\"",
+    "test:all": "node --test \"hive/**/*.test.mjs\""
+  },
   "engines": {
     "node": ">=20.19"
   },
@@ -9,9 +16,13 @@
     "@ai-hero/sandcastle": "0.5.10",
     "@anthropic-ai/sdk": "0.102.0",
     "better-sqlite3": "12.10.0",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.0",
     "openai": "6.42.0",
     "tsx": "4.22.4",
     "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "markdownlint-cli2": "^0.17.2",
+    "vitest": "^4.1.10"
   }
 }

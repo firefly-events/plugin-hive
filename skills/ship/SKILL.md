@@ -20,6 +20,7 @@ advancing shipped stories.
 | `--release-id <id>` | Use a stable release artifact ID. Default: `<project>-<YYYYMMDD-HHMMSS>`. |
 | `--dry-run` | Stop after displaying the resolved ship plan. Do not execute, generate artifacts, or mark shipped. |
 | `--campaign` | Opt in to the post-release marketing campaign step (step 9). Equivalent to `ship.campaign: true` in `hive.config.yaml`. Default: off. Consumer projects only. |
+| `--waive-verdict <epic-id>/<story-id> --reason "<text>" --owner "<name>"` | Record an audited waive on that story's PENDING `manual_verdict` (see step 2a) so it no longer blocks a UI-epic done-done. May repeat for multiple stories. Refused if the verdict is not currently PENDING, or `--reason`/`--owner` is empty. |
 
 ## State Directory Resolution
 
@@ -122,6 +123,85 @@ After reconciliation:
 - If the ship set is empty, stop. Do not run a ship action, generate release
   artifacts, or mark anything shipped.
 
+### 2a. manual_verdict nag + UI-done-done refusal (story wr-3-manual-verdict-aging)
+
+Reuses the existing `manual_verdict` block ([`hive/references/story-yaml-schema.md §9`](../../hive/references/story-yaml-schema.md)) — no new schema block. Runs after reconciliation (step 2) so the ship set is final, before the changelog is authored (step 3).
+
+1. Handle any `--waive-verdict` flags first:
+
+   ```python
+   from hive.lib.manual_verdict_status import waive_pending_verdict, WaiveError
+
+   try:
+       waive_pending_verdict(story_path, reason=reason, owner=owner)
+   except WaiveError as exc:
+       # stop and report — do not silently skip a malformed waive request
+       report(str(exc))
+   ```
+
+2. For every target epic, run two independent checks (story wr-3-manual-verdict-aging,
+   REVISION-1b — these are deliberately NOT the same check; conflating them was the
+   round-1 bug):
+
+   - **Broad nag scope** — does the epic have ANY `manual_verdict` block at all, on any
+     of its stories, regardless of `required`
+     (`hive/lib/manual_verdict_status.py:epic_has_manual_verdict_blocks`)? Epics with
+     zero `manual_verdict` blocks anywhere skip this step entirely.
+   - **Device-pass (refusal-eligible) scope** — does the epic have at least one story
+     whose `manual_verdict.required` is `true`
+     (`hive/lib/manual_verdict_status.py:epic_has_required_device_pass`)? Only these
+     epics are eligible for the done-done refusal in step 3b. `required` is a
+     plan-derived flag ([`story-yaml-schema.md`](../../hive/references/story-yaml-schema.md)
+     §9.1b) — never inferred here from presence alone.
+
+3. For any epic in the broad nag scope, list its non-waived PENDING verdicts and
+   **nag** (this is unconditional — shown for every open PENDING verdict, `required`
+   or not):
+
+   ```python
+   from hive.lib.manual_verdict_status import find_pending_manual_verdicts
+
+   open_pending = [
+       s for s in find_pending_manual_verdicts(repo_root, state_dir, epic_id=epic_id)
+       if not s.waived
+   ]
+   ```
+
+   - If `open_pending` is non-empty, print each entry (story id, days pending) as part
+     of the dry-run plan / pre-flight summary regardless of outcome.
+
+   3b. For epics in the device-pass (refusal-eligible) scope only, list the subset that
+   actually blocks:
+
+   ```python
+   from hive.lib.manual_verdict_status import blocking_pending_verdicts
+
+   blocking = blocking_pending_verdicts(repo_root, state_dir, epic_id)
+   ```
+
+   `blocking_pending_verdicts` already filters to non-waived AND `required: true` — a
+   `required: false`/absent PENDING verdict is never returned here, so it can never
+   block, even though it was still nagged in the broad step above.
+
+   - **Refuse UI-done-done** for that epic: it must not be marked `shipped` (step 8)
+     while `blocking` is non-empty. Report:
+
+     ```text
+     Ship refused for {epic-id}: {N} manual_verdict still PENDING and not waived:
+       - {story-id} — PENDING ({days}d)
+     Run /test --simulated-manual (or the actual-manual backend) to render a verdict,
+     or re-run /ship with --waive-verdict {epic-id}/{story-id} --reason "..." --owner "..." to waive it.
+     ```
+
+     This refusal applies per-epic: a multi-epic release proceeds for epics that are
+     clear and stops only for the blocked epic(s), same as `--partial`'s per-story
+     granularity in step 2.
+
+4. Epics outside the device-pass scope (no `required: true` anywhere — including
+   non-UI epics whose stories only ever set `required: false`), or whose `blocking`
+   list is empty (including because every PENDING was waived), proceed unaffected by
+   the refusal — even if they were nagged in step 3.
+
 ### 3. Author the Unreleased Changelog Entry
 
 Runs after reconciliation (so the ship set is final) and before version
@@ -174,7 +254,10 @@ For each epic where `version_bump` is `major`, `minor`, or `patch`, verify that
    - root `plugin.json` when present.
 2. Parse JSON with a structured parser. Collect every recursive `version` field.
 3. Verify all collected version values are in lockstep. If not, stop and report
-   the mismatched path/key/value set.
+   the mismatched path/key/value set. Also check the **`README.md` version badge**
+   (the `img.shields.io/badge/version-<x.y.z>-...` URL) — it is a version surface
+   too, and a common drift point (not JSON, so structured collection misses it).
+   A stale badge is a lockstep failure to report and fix, not a pass.
 4. Verify `CHANGELOG.md` contains an `## [Unreleased]` entry for the epic that
    names the planned bump level. The prose entry was just authored in-flow by
    step 3, so the section is expected to exist by now; the bump-level
@@ -197,6 +280,7 @@ in `skills/execute/SKILL.md` step 7e:
 
 - compute the next SemVer from the current lockstep version;
 - update every discovered `version` field in every version source;
+- update the `README.md` version badge URL to the same version;
 - add the version-accounting changelog line under `## [Unreleased]` (the
   human-readable prose entry was already authored in step 3);
 - commit the version-source and changelog changes with:
@@ -210,6 +294,34 @@ while the planned bump is unverified.
 
 `/ship` is a verifier and safety net. The normal owner of the planned version bump
 is still `/execute`.
+
+### 4b. Cut the Changelog (stamp the release)
+
+After the version is verified (step 4) and before the ship action runs, promote the
+staged `## [Unreleased]` section in `CHANGELOG.md` to a dated version heading so the
+released changelog reflects the version that actually ships. **Skipping this is what
+strands release notes under `[Unreleased]` while `plugin.json` moves ahead** — the
+newest *versioned* changelog entry then drifts behind the real version (this is
+exactly how the 2.14.0 notes were left under `[Unreleased]` while `plugin.json` read
+2.14.0).
+
+Skip this step only for a pure none-bump run — when every target epic is
+`version_bump: none` and no version is being cut. Then leave `[Unreleased]` in place
+so the none-bump notes accumulate for the next versioned release.
+
+When a version IS being cut:
+
+1. Rename the current `## [Unreleased]` heading to `## [{version}] - {YYYY-MM-DD}`,
+   using the verified version from step 4 and the ship date (UTC). The date is the
+   release date, not the date the `[Unreleased]` content was first authored.
+2. Insert a fresh, empty `## [Unreleased]` heading immediately above it so the next
+   cycle's step 3 has a staging section to write into.
+3. Never edit an already-released entry below — `CHANGELOG.md` stays append-only
+   (`hive/references/changelog-entry-format.md` §1). This step only promotes the
+   staging section to a versioned heading; it never rewrites released history.
+4. Commit the stamp on the release branch (`develop`, per step 6a) so the promotion
+   PR carries it to `main` and the public sync publishes the correctly-versioned
+   changelog.
 
 ### 5. Resolve Ship Target And Dry Run
 
@@ -275,20 +387,111 @@ Do not execute unless the typed confirmation exactly matches `ship {release-id}`
 
 ### 6. Execute Ship Action
 
-Run the resolved command from the repository root.
+#### 6a. Release branch flow — promote develop → main (no backmerge)
 
-If the command exits non-zero, stop and report the command, exit code, and the
-first useful error output. Do not generate release artifacts and do not mark any
-story shipped.
+For `github-release` (and any `main`-tagged target), the release tag must be cut
+on `main`, and `main` must already contain the release commits authored in steps
+2–4 (reconcile, changelog, version bump). Those steps write to the working branch,
+which for a release is `develop`. Reach `main` with a **single promotion PR** — do
+not backmerge afterward.
 
-If the command succeeds, capture:
+Canonical flow:
 
-- command;
-- exit code;
-- timestamp;
-- release ID;
-- target epics;
-- shipped story IDs.
+1. Ensure the version bump (step 4), the changelog entry (step 3) **stamped to its
+   version heading (step 4b)**, and the story reconcile (step 2) are committed **on
+   `develop`** (open a normal PR to `develop` if they are not already merged there).
+2. Open **one** promotion PR with **`head=develop`, `base=main`**:
+
+   ```bash
+   gh pr create --base main --head develop \
+     --title "release: promote develop → main (v{version})" \
+     --body "Promotes v{version}: {epic list}. Merging makes main == develop — no backmerge."
+   ```
+3. **Open the PR and STOP — this is the release gate.** `/ship` opens the promotion
+   PR and does **not** merge it. Report:
+
+   ```text
+   Release PR opened: {url}
+   Review the full develop→main diff and merge it when ready to publish v{version}.
+   /ship does not merge, tag, or publish on your behalf.
+   ```
+
+   The operator reviews the diff and merges when ready. Because `head=develop`,
+   merging leaves `main` == `develop`, so no backmerge is ever needed. **For a
+   `main`-tagged target, `/ship` ends here.** Everything downstream — tag/release,
+   Announce, Mark Shipped — is the post-merge finalize (step 6b) and runs only after
+   the human has merged the promotion PR.
+
+**Anti-pattern (do not do this):** cutting a throwaway `release/<v>` branch off
+`develop` and merging it **only** to `main`. That leaves the version bump and
+changelog on `main` but not `develop`, forcing a follow-up develop←main backmerge
+PR (the debt this flow removes). Author on `develop`; promote `develop → main`.
+
+Skip this sub-step for targets that do not tag `main` (e.g. `vercel`, `npm` from
+the working branch, or `custom` commands that manage their own refs).
+
+> **Hard gate — `/ship` never publishes autonomously.** For any target that tags or
+> publishes from `main`, `/ship`'s terminal action for the run is *opening* the
+> promotion PR. It MUST NOT merge that PR, push to `main`, create the tag or GitHub
+> release, trigger the public sync, or mark stories shipped as part of the same run.
+> The operator's merge of the promotion PR is the sole release trigger. Only after
+> that merge does the finalize (6b) run.
+
+#### 6b. Finalize the release (post-merge only)
+
+For a `main`-tagged target, this runs **only after the operator has merged the
+promotion PR from 6a** and `main` contains the release commits. Resume `/ship` (or
+re-invoke it in finalize mode) once the merge has landed:
+
+1. Confirm `main` is at the promoted tip — the promotion PR is merged and, if a
+   public-sync workflow exists, it has run.
+1a. **Merge-shape check.** Before cutting anything, verify the promotion merge
+    commit preserved per-story commits for every multi-story epic in the ship
+    set — a squash-merged promotion PR is what destroyed trunk-visible rigor
+    in the WFD campaign (E6-E8). Use
+    [`hive/lib/merge_shape_check.py`](../../hive/lib/merge_shape_check.py):
+
+    ```python
+    from hive.lib.merge_shape_check import check_merge_shape, MergeShapeError
+
+    try:
+        check_merge_shape(
+            repo_root,
+            [
+                {
+                    "epic_id": epic_id,
+                    "story_ids": [s.id for s in target_epic.stories],
+                    "waived": epic_id in waived_epic_ids,  # explicit operator waive only
+                }
+                for epic_id, target_epic in ship_set_epics.items()
+            ],
+            merge_commit=promoted_merge_sha,  # the develop->main promotion merge commit
+        )
+    except MergeShapeError as exc:
+        # stop here — do not cut the tag, announce, or mark anything shipped
+        report(str(exc))
+    ```
+
+    The check reads real git history at `promoted_merge_sha` (parent count and
+    per-story `[{story_id}] ...` commit subjects on the merged-in side) —
+    deterministic, not prose. It is a no-op (`status: "exempt"`) for
+    single-story epics and for any epic id the operator explicitly passed as
+    waived; every other multi-story epic in the ship set must show a
+    two-parent merge commit whose merged-in side contains a commit for every
+    one of its story ids, or `/ship` refuses and reports exactly which epic
+    and which story ids are missing. Record any waive used (which epic, why)
+    in the ship report so it is visible, not silent.
+2. Cut the tag/release on `main` with the resolved command (e.g.
+   `gh release create v{version} --target main --generate-notes`).
+3. Proceed to Announce (step 7) and Mark Shipped (step 8).
+
+For non-`main`-tagged targets (`vercel`, `npm`, `custom`), 6a is skipped and this
+step runs the resolved ship command directly from the working branch.
+
+Run the resolved command from the repository root. If it exits non-zero, stop and
+report the command, exit code, and the first useful error output; do not generate
+release artifacts and do not mark any story shipped. On success, capture: command,
+exit code, timestamp, release ID, target epics, and shipped story IDs.
 
 ### 7. Announce
 
@@ -323,6 +526,10 @@ shipped until the release artifacts exist.
 
 Only after the ship action succeeds and release artifacts exist, advance every
 story in the ship set from `complete` to `shipped`.
+
+Re-check step 2a's refusal here before writing `shipped` for any device-pass epic —
+if a PENDING, non-waived `manual_verdict` reappeared or was never cleared (e.g. a
+resumed/finalize-mode run), stop for that epic instead of marking it done-done.
 
 Write the story YAML projection:
 
@@ -458,4 +665,6 @@ Worktree cleanup:
 - [`skills/execute/SKILL.md`](../execute/SKILL.md) - primary version bump owner and ship-time safety-net patch rules.
 - [`skills/status/SKILL.md`](../status/SKILL.md) - read-only status reporting and `deriveStoryStatus` usage.
 - [`hive/lib/release_post.mjs`](../../hive/lib/release_post.mjs) - release artifact generator.
+- [`hive/lib/merge_shape_check.py`](../../hive/lib/merge_shape_check.py) - step 6b merge-shape check (no-squash for multi-story epics).
+- [`hive/lib/manual_verdict_status.py`](../../hive/lib/manual_verdict_status.py) - step 2a/8 PENDING `manual_verdict` nag, UI-done-done refusal, and audited waive.
 - [`skills/marketing-campaign/SKILL.md`](../marketing-campaign/SKILL.md) - post-release campaign skill invoked by step 9 (`--from-ship` mode); owns the user-review gate and campaign output.

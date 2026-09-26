@@ -158,7 +158,7 @@ The dispatch workflow + bridge stack stories of the same epic onto a single bran
 When a `hive:ready` issue carries a `hive:epic:<epic-id>` label:
 
 - **Branch.** The bridge derives `branch = feat/<epic-id>` (instead of `agent/issue-<n>`). The first story of the epic creates the branch; later stories push to the same branch.
-- **Base.** `resolveGitFlow({ cwd })` (`hive/lib/git_flow.mjs`) is called at dispatch time. With `default_pr_base: auto` (the shipped default), the helper probes `git rev-parse --verify origin/develop` and returns `develop` on success, `main` otherwise.
+- **Base.** `resolve_git_flow(cwd)` (`hive/lib/git_flow.py`) is called at dispatch time. With `default_pr_base: auto` (the shipped default), the helper probes `git rev-parse --verify origin/develop` and returns `develop` on success, `main` otherwise.
 - **PR.** The workflow opens a `--draft` PR on the first story (title `[epic] <epic-id>`) and *edits the same PR's body* on subsequent stories — no second PR is created. The body is capped at 25 story entries with a "see commits" pointer.
 - **Promotion.** When the last `hive:story:*` issue of the epic flips to `hive:shipped`, the workflow calls `gh pr ready "feat/<epic-id>"`, moving the PR out of draft.
 

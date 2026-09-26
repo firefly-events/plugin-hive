@@ -201,3 +201,57 @@ test('existing fields: multica sub-fields carry through with non-null squad_eval
   assert.match(marker, /"HIV-99"/, 'identifier must appear in multica block');
   assert.match(marker, /"task-xyz"/, 'task_id must appear in multica block');
 });
+
+// --- FIX 3: degraded distill must surface a one-line warning (S2-AC4) ---
+
+test('degraded distill: writeMulticaRunEpisode emits a stderr warning, not silence', async (t) => {
+  const dir = await makeTempDir();
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+
+  const fakePython = path.join(dir, 'fake-python.sh');
+  await fs.writeFile(
+    fakePython,
+    '#!/bin/sh\nprintf \'{"skipped": false, "written": "/tmp/raw.md", "kg_emitted": 0, "degraded": true, "error": "claude cli unavailable"}\'\n',
+    { mode: 0o755 },
+  );
+
+  const writes = [];
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => { writes.push(String(chunk)); return true; };
+  try {
+    const result = await writeMulticaRunEpisode(
+      makeOpts(dir, { distill: { persona: 'backend-developer', pythonBin: fakePython } }),
+    );
+    assert.equal(result.distill?.degraded, true);
+    assert.ok(
+      writes.some((line) => line.includes('degraded to raw-capture') && line.includes('claude cli unavailable')),
+      `expected a degraded-distill warning on stderr, got: ${JSON.stringify(writes)}`,
+    );
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});
+
+test('non-degraded distill: writeMulticaRunEpisode does not warn', async (t) => {
+  const dir = await makeTempDir();
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+
+  const fakePython = path.join(dir, 'fake-python.sh');
+  await fs.writeFile(
+    fakePython,
+    '#!/bin/sh\nprintf \'{"skipped": false, "written": "/tmp/curated.md", "kg_emitted": 1, "degraded": false, "error": null}\'\n',
+    { mode: 0o755 },
+  );
+
+  const writes = [];
+  const originalWrite = process.stderr.write;
+  process.stderr.write = (chunk) => { writes.push(String(chunk)); return true; };
+  try {
+    await writeMulticaRunEpisode(
+      makeOpts(dir, { distill: { persona: 'backend-developer', pythonBin: fakePython } }),
+    );
+    assert.ok(!writes.some((line) => line.includes('degraded')), `unexpected warning: ${JSON.stringify(writes)}`);
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+});

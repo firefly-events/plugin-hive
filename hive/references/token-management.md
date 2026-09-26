@@ -26,7 +26,10 @@ artifacts:
 tokens:                         # optional extension to status markers
   input: 12500
   output: 3200
+  cost_usd: 0.0412              # optional; sourced from Agent SDK result message total_cost_usd
 ```
+
+`tokens.cost_usd` is optional. Populate it from the Agent SDK result message field `total_cost_usd` when available (headless / Claude Agent SDK usage billed from a separate credit pool as of 2026-06-15). Omit or leave absent for older markers; the standup treats missing values as zero.
 
 The orchestrator maintains a running total per story and per epic. When approaching a limit (`warning_threshold`), it surfaces a warning before starting the next step.
 
@@ -79,3 +82,4 @@ During standup, the orchestrator can report:
 - Approaching budget limits
 - Context window refreshes that occurred
 - Budget remaining for active epics
+- Credit spend: sum of `tokens.cost_usd` across completed markers, shown as a burn-rate line vs. the credit pool (markers without `cost_usd` contribute zero)

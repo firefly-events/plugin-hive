@@ -141,6 +141,55 @@ for (const relativePath of uniquePaths) {
   }
 }
 
+// ── Manifest Source section verification ────────────────────────────────────
+// Parse the "## Manifest Source" table and verify that every cited
+// hive/manifests/*.process.yaml file exists on disk and is git-tracked.
+
+function parseManifestSourcePaths(markdown) {
+  const lines = markdown.split('\n');
+  const paths = [];
+  let inSection = false;
+
+  for (const line of lines) {
+    if (line.startsWith('## Manifest Source')) {
+      inSection = true;
+      continue;
+    }
+    if (inSection && line.startsWith('## ')) break;
+    if (!inSection || !line.startsWith('|')) continue;
+    if (/^\|[\s\-|]+\|$/.test(line)) continue;
+
+    const cells = line.split('|').slice(1, -1).map((c) => c.trim());
+    if (cells.length >= 2) {
+      // cells[1] is the Manifest column — extract the path token
+      const manifestPath = cells[1].match(/hive\/manifests\/[a-z0-9-]+\.process\.yaml/)?.[0];
+      if (manifestPath) paths.push(manifestPath);
+    }
+  }
+
+  return paths;
+}
+
+const manifestPaths = parseManifestSourcePaths(content);
+
+for (const relativePath of manifestPaths) {
+  const absolutePath = resolve(repoRoot, relativePath);
+
+  if (!existsSync(absolutePath)) {
+    failures.push({ path: relativePath, reason: 'manifest not found on disk' });
+    continue;
+  }
+
+  try {
+    execSync(`git ls-files --error-unmatch "${relativePath}"`, {
+      cwd: repoRoot,
+      stdio: 'pipe',
+    });
+  } catch {
+    failures.push({ path: relativePath, reason: 'manifest not tracked by git' });
+  }
+}
+
 if (failures.length > 0) {
   console.error(`dispatch-parity.md: ${failures.length} path(s) failed verification:`);
   for (const { path, reason } of failures) {
@@ -149,7 +198,7 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`dispatch-parity.md: ${uniquePaths.length} paths verified`);
+console.log(`dispatch-parity.md: ${uniquePaths.length} skill paths + ${manifestPaths.length} manifest path(s) verified`);
 
 // Bump the "## Last verified:" date stamp unless --no-bump was passed
 if (!noBump) {

@@ -19,7 +19,7 @@ HIVE_STATE_DIR = hive_config.paths.state_dir || ".pHive"
 
 All episode markers, messages sidecars, transcript references, and run summaries are rooted under that resolved state dir unless the Workflow tool returns an absolute transcript path.
 
-Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `planning-routing`; do not silently fall through to direct `TeamCreate`, Codex, or Multica planning paths. Fallback to those paths is the caller's responsibility (`planning-routing` Step 0.5) and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
+Kickoff-gate fall-through behavior is explicit: if the runtime precondition gate rejects this mode, emit a structured `precondition_failed` error with `field_sources` and return control to `planning-routing`; do not silently fall through to direct natural-language spawn, Codex, or Multica planning paths. Fallback to those paths is the caller's responsibility (`planning-routing` Step 0.5) and is gated on this skill returning a structured rejection, not on a silent partial dispatch.
 
 Delegation rules: the orchestrator coordinates Workflow script assembly, Workflow invocation, polling, episode marker writes, and summary return; it does not write planning documents itself. Workflow agents execute assigned persona steps and return structured planning-artifact payloads (paths plus brief content summaries). Persona behavior is loaded from `hive/agents/<persona>.md`; do not improvise inline personas. **All workflow agents run on the default workflow subagent (no Codex `agentType`)** — cc-workflows mode is intentionally an inline-Claude substrate so the returned `<result>` IS the work product. `agentType: "codex:codex-rescue"` is forbidden here because it forwards to a separate Codex CLI run and returns a status report immediately, breaking the dispatch → immediate file-list return → episode marker write → reconcile contract. Codex routing belongs to the other planning paths (`planning-routing`'s `codex-invoke` route via cmux panes); cc-workflows mode is an inline-Claude substrate and intentionally does not overlap.
 
@@ -38,7 +38,7 @@ The resolver lives in `/plan` Phase 0c and mirrors the multica resolver shape:
 - Any other value falls through to the existing planning-routing path (multica, codex, direct).
 - Env wins over config.
 
-On selection, `/plan` Phase 0 routes the assembled planning cell here instead of spawning direct `TeamCreate`, Codex, or Multica teammates.
+On selection, `/plan` Phase 0 routes the assembled planning cell here instead of spawning direct natural-language spawn, Codex, or Multica teammates.
 
 **Inputs:**
 - `assembled_personas[]` — ordered final planning persona names (e.g. `researcher`, `technical-writer`, `architect`, `tpm`, `ui-designer`).
@@ -91,11 +91,13 @@ The process below mirrors `execute-mode-cc-workflows`: precondition gate, per-pe
 // Worktree-isolation check — must be the first action in this gate.
 // Rejects before any field resolution if the skill is not running inside
 // a `.claude/worktrees/<name>/` checkout.
-import { assertWorktreeIsolation } from '../../../hive/lib/cc-workflows-preconditions.mjs';
-assertWorktreeIsolation(); // throws precondition_failed if cwd is not a worktree
+import { execFileSync } from 'node:child_process';
+const precondition = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_preconditions.py'], { input: JSON.stringify({ cwd: process.cwd() }), encoding: 'utf8' }));
+// Python equivalent of assertWorktreeIsolation(); this must remain first.
+if (!precondition.ok) throw Object.assign(new Error(precondition.error), precondition);
 ```
 
-Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.154`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
+Resolve runtime and tooling before dispatching any persona: verify CC runtime version `>= 2.1.217`; read `claude --version` when available; otherwise rely on Workflow tool presence as proxy. Verify `planning.mode` resolves to `"cc-workflows"` OR `HIVE_PLANNING_MODE=cc-workflows` is set. Resolve `${HIVE_STATE_DIR}` from `hive_config.paths.state_dir`, then default to `.pHive`, and confirm `assembled_personas[]` plus `planning_story` are present.
 
 Runtime field resolution must preserve source attribution:
 
@@ -112,7 +114,7 @@ field_sources:
     value: .pHive
   cc_runtime:
     source: claude --version | Workflow tool presence proxy
-    value: 2.1.154
+    value: 2.1.217
 ```
 
 On reject, exit with a structured error and do not dispatch:
@@ -120,7 +122,7 @@ On reject, exit with a structured error and do not dispatch:
 ```json
 {
   "error": "precondition_failed",
-  "message": "CC Workflows planning mode requires runtime cc-workflows and Claude Code >= 2.1.154 or Workflow tool presence.",
+  "message": "CC Workflows planning mode requires runtime cc-workflows and Claude Code >= 2.1.217 or Workflow tool presence.",
   "field_sources": {}
 }
 ```
@@ -153,8 +155,8 @@ For each persona in `assembled_personas[]`:
    - Persona files are referenced at `hive/agents/<persona>.md`; prompts carry the integration branch and no-git contracts.
    - **`opts.model` is REQUIRED on every `agent()` call.** Before assembling the Workflow script, import and call the model-tier resolver for each persona:
      ```js
-     import { resolveModelTier } from 'hive/lib/cc-workflows-model-tier.mjs';
-     const { tier, source } = resolveModelTier(persona, { config: hive_config });
+     const { tier, source } = JSON.parse(execFileSync('python3', ['hive/lib/cc_workflows_model_tier.py'], { input: JSON.stringify({ persona, config: hive_config }), encoding: 'utf8' }));
+     // Python equivalent of resolveModelTier(persona, { config: hive_config }).
      // assembled agent() call must carry opts.model:
      // agent(prompt, { schema, phase, label, model: tier })
      ```
@@ -318,7 +320,7 @@ Runtime and branch configuration:
 | `planning.mode` | `"cc-workflows"` |
 | `HIVE_PLANNING_MODE` | `cc-workflows` |
 | `HIVE_STATE_DIR` | `hive_config.paths.state_dir \|\| ".pHive"` |
-| Minimum CC runtime version | `2.1.154` |
+| Minimum CC runtime version | `2.1.217` |
 | Integration branch convention | `feat/<epic-id>` |
 
 Runtime source priority is resolver-owned (`/plan` Phase 0c), but every reject must report the consulted source in `field_sources`. Persona routing uses the same roster as `/plan`; the behavior file remains `hive/agents/<persona>.md`, and the routing backend determines only Workflow `agentType`.

@@ -189,6 +189,18 @@ export async function promoteHiveMemory(opts) {
   return { memoryPath, indexPath };
 }
 
+// insight_distill.py imports hive.lib.kg_emit — it must run as `-m
+// hive.lib.insight_distill` (not a bare file path) with the repo root as cwd
+// so that package-qualified import resolves regardless of the caller's cwd.
+const REPO_ROOT = new URL('../../..', import.meta.url).pathname;
+const DEFAULT_DISTILL_TIMEOUT_MS = 60_000;
+
+// Bridge glue only (Python-first policy, .pHive/proposals/language-strategy-adr.md):
+// shell to hive/lib/insight_distill.py and hand back its JSON result. Dedup,
+// generalization, scoring, curated-memory formatting, and KG emission all
+// live in the Python module — this function only gathers paths and invokes
+// it. A failed or unavailable interpreter/CLI must never fail the episode
+// write, so any throw here is caught and reported, not propagated.
 export async function runMulticaInsightDistill(opts) {
   const {
     hiveStateDir = '.pHive',
@@ -197,41 +209,33 @@ export async function runMulticaInsightDistill(opts) {
     workDir,
     messagesPath,
     selfCapturePath,
-    diffBaseRef,
-    diffArgs,
-    teamMemory,
-    hiveMemories = [],
-    memoryRoot,
-    collectInputs = collectMulticaDistillInputs,
+    persona,
+    pythonBin = 'python3',
+    claudeBin,
+    timeoutMs = DEFAULT_DISTILL_TIMEOUT_MS,
+    teamMemoriesRoot,
   } = opts;
 
-  const inputs = await collectInputs({
-    hiveStateDir,
-    epicHandle,
-    storyId,
-    workDir,
-    messagesPath,
-    selfCapturePath,
-    diffBaseRef,
-    diffArgs,
-  });
-
-  const teamMemoryPath = await writeTeamMemory({
-    stateDir: hiveStateDir,
-    epicHandle,
-    storyId,
-    content: teamMemory,
-  });
-  const promotedMemories = [];
-  for (const memory of hiveMemories) {
-    const promoted = await promoteHiveMemory({ memoryRoot, memory });
-    if (promoted) promotedMemories.push(promoted);
+  if (!persona) {
+    return { skipped: true, reason: 'missing-persona', written: null, kg_emitted: 0, degraded: false, error: null };
   }
 
-  return {
-    inputs,
-    teamMemoryPath,
-    promotedMemories,
-    skipped: !teamMemoryPath && promotedMemories.length === 0,
-  };
+  const args = [
+    '-m', 'hive.lib.insight_distill',
+    '--epic', String(epicHandle),
+    '--story', String(storyId),
+    '--persona', String(persona),
+    '--state-dir', String(hiveStateDir),
+  ];
+  if (workDir) args.push('--work-dir', String(workDir));
+  if (selfCapturePath) args.push('--self-capture', String(selfCapturePath));
+  if (messagesPath) args.push('--transcript', String(messagesPath));
+  if (teamMemoriesRoot) args.push('--team-memories-root', String(teamMemoriesRoot));
+  if (claudeBin) args.push('--claude-bin', String(claudeBin));
+
+  const { stdout } = await execFileAsync(pythonBin, args, {
+    timeout: timeoutMs + 10_000,
+    cwd: REPO_ROOT,
+  });
+  return JSON.parse(stdout);
 }

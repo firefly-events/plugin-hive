@@ -1,8 +1,23 @@
 name: review
 description: >
-  Review flow graph — reviewer producer → reconcile → validation gate over
-  the committed review artifact. Bounded retry on reviewer node (no LOOP primitive).
-  Shape mirrors plan.workflow.yaml and test-swarm.workflow.yaml conventions.
+  Review flow graph — reviewer → reconcile-review → gate-review-artifact.
+  This is the DAG front-door graph for `/review` (see skills/review/SKILL.md
+  Phase 0b): it is artifact-readiness only. There is no in-graph fix/implement
+  agent here — a needs_revision verdict is handled OUTSIDE this graph by
+  re-triggering pickup through the same dispatch path `/execute` uses (see
+  skills/review/SKILL.md step 7). Bounded retry on the reviewer node covers
+  individual review-attempt flakiness (see reviewer.md "Retry" — no LOOP
+  primitive needed). A prior draft of this file carried a disconnected
+  `review-converge-loop` LOOP node (no feature/convergence_signal, zero body
+  nodes) intended for an in-graph review<->fix cycle that was never built for
+  this workflow; it was removed as vestigial dead code (pr20-fable-review M1) —
+  it had no `depends_on` and nothing depended on it, so it never participated
+  in the reviewer -> reconcile-review -> gate-review-artifact chain and only
+  existed to crash the walker (LoopNodeInvariantError) once loaded. The
+  in-graph converge-loop pattern IS used for real fix cycles elsewhere, e.g.
+  development.classic.workflow.yaml's `review-converge-loop`
+  (feature: review_converge, sub_graph: review-fix-cycle), which has a real
+  `developer` agent to apply fixes in-graph.
 version: "1.0.0"
 
 steps:
@@ -16,6 +31,27 @@ steps:
       Produce a review artifact (verdict + findings) and commit it to the working
       tree so the reconcile + gate nodes can validate it.
     depends_on: []
+    config:
+      # Match-resolve-load-invoke seam (hive/lib/skill_binding.py): the
+      # AgentHandler resolves this binding itself before spawning the agent,
+      # injects skills/review/SKILL.md into the brief, and sets the
+      # `skill_invoked` output deterministically — invocation no longer
+      # depends on the spawned agent reading step 2 of reviewer.md prose.
+      # Two authoritative skills govern this node: the review procedure AND
+      # the verify (evidence-gathering) procedure the reviewer must run first
+      # (reviewer.md step 2). BOTH are resolved+injected by the AgentHandler
+      # and BOTH fail closed if missing/unreadable — verify is no longer an
+      # inert prose request. (PR #74 review P1: verify inert binding.)
+      skill_binding:
+        - persona_path: hive/agents/reviewer.md
+          trigger: "running any code review"
+          # This node IS the in-graph execution of the review skill. Guard the
+          # injection so the agent skips skills/review/SKILL.md Phase 0/0b
+          # dispatch (which would re-enter this same review DAG) and runs the
+          # review procedure directly. (PR #74 review P1: recursive self-launch.)
+          in_graph: true
+        - persona_path: hive/agents/reviewer.md
+          trigger: "verifying acceptance-criteria, fallback, and command/test evidence before code review"
     inputs:
       - name: diff_target
         source: context
@@ -33,6 +69,25 @@ steps:
       - name: review_artifact
         type: string
       - name: commit_sha
+        type: string
+      # s3-convergence-signal: boolean convergence signal. True when the review
+      # passes (verdict = passed or needs_optimization); false when it requires
+      # a fix (verdict = needs_revision). Consumed by the review-converge-loop's
+      # skip_when predicate to short-circuit subsequent rounds.
+      - name: review_passed
+        type: json
+      # s1-code-review-actual-invocation: declared so the AgentHandler's
+      # deterministic skill_invoked write (see config.skill_binding above)
+      # is a real graph output, not merely a step-file-documented convention.
+      # With review + verify bound, this surfaces as a list of both skill paths.
+      - name: skill_invoked
+        type: json
+      # PR #74 review P1: verify_evidence is now a DECLARED output, so the
+      # #13/#22 under-run guard fails the node closed when the reviewer does
+      # not produce the verify evidence report — verify is enforced, not
+      # advisory. An empty-domain review must still emit evidence explaining
+      # that no acceptance claims or runnable commands were present.
+      - name: verify_evidence
         type: string
     retry:
       max_attempts: 3

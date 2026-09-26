@@ -11,7 +11,7 @@
 A Claude Code plugin that turns your project into a coordinated swarm of AI specialists with the discipline of a real software team — planning, design, execution, code review, test. Built at [Firefly Events](https://ff.events) while shipping our own products. Open source.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.13.3-green.svg)](.claude-plugin/marketplace.json)
+[![Version](https://img.shields.io/badge/version-2.16.0-green.svg)](.claude-plugin/marketplace.json)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-compatible-blueviolet.svg)](https://claude.ai/code)
 
 ---
@@ -69,6 +69,19 @@ If you've found that:
 ```
 
 Each story produces a committed, reviewed state. The orchestrator handles coordination; you provide judgment at the planning and review gates.
+
+### Testing
+
+`/hive:test` runs the test swarm using Playwright (web) and Maestro (mobile) by default. An additional **`actual-manual` tier** is available for vision-cursor fidelity testing — it clicks real pixel-grounded coordinates and verifies each step's outcome, catching render-fidelity failures that the DOM cannot expose.
+
+| Mode | How to enable | What it does |
+|------|--------------|--------------|
+| `simulated` (default) | no config needed | Playwright/Maestro — fast, deterministic |
+| `actual` | `HIVE_TEST_MODE=actual` or `test.mode: actual` in `hive.config.yaml` | Vision-cursor flow runner — pixel-grounded clicks + per-step outcome verification |
+
+**`actual-manual` prerequisite:** a local MLX Qwen2.5-VL sidecar must be running before invoking this tier (provides the grounding model on-device).
+
+**Scope note:** `actual-manual` is web-first (Playwright). Mobile/Maestro binding and CI MLX provisioning are explicit follow-ons. Vision is a targeted escalation — Playwright stays primary; use `actual-manual` when you suspect render-fidelity failures the DOM cannot expose.
 
 ---
 

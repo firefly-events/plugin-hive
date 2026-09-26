@@ -1,6 +1,6 @@
 # Agent Spawn Skill
 
-Spawn a roster agent with full config validation, persona injection, and memory loading. This skill enforces the pre-spawn checklist from the orchestrator persona — use it instead of raw TeamCreate or Agent calls for story-level work.
+Spawn a roster agent with full config validation, persona injection, and memory loading. This skill enforces the pre-spawn checklist from the orchestrator persona — use it instead of calling the `Agent` tool directly for story-level work.
 
 **Input:** `$ARGUMENTS` contains the agent name and story context.
 
@@ -35,7 +35,15 @@ Invoke `skills/hive/skills/memory-loading/SKILL.md` with:
 - `task_description`: story spec + current step task text
 - `epic_handle`: the parent epic identifier (optional, enables L2 KG decision context)
 
-Consume `prior_knowledge_block` and `staleness_signals`. Inject `prior_knowledge_block` as the "Prior Knowledge" section after the persona and before the task instructions in the assembled prompt structure.
+Consume `prior_knowledge_block`, `staleness_signals`, and `memory_count`. Inject `prior_knowledge_block` as the "Prior Knowledge" section after the persona and before the task instructions in the assembled prompt structure.
+
+Derive the learning-loop dimensions from `memory_count` (this is the only point in the spawn path where warm-vs-cold is actually known, not guessed):
+- `prior_experience_injected = memory_count > 0`
+- `prior_experience_count = memory_count`
+
+**CAVEAT (loud, do not drop):** this derivation only happens on the classic tmux `Agent(name:)` path described by this skill. The Hermes/multica-dispatched execution loop respawns agents cold and does not call `memory-loading` or set these dimensions — a Hermes run showing `prior_experience_injected` absent means "this path isn't wired warm yet," not "injection had no effect." Do not read absence-of-dimension on that path as evidence against the learning loop.
+
+When emitting the `agent_spawn` metrics event for this spawn (`hooks/metrics-agent-spawn.sh`), pass these through as `HIVE_PRIOR_EXPERIENCE_INJECTED` (`"true"`/`"false"`) and `HIVE_PRIOR_EXPERIENCE_COUNT` so they land in `dimensions.prior_experience_injected` / `dimensions.prior_experience_count` on the emitted row. See `.pHive/metrics/metrics-event.schema.md` §5 for the dimension contract.
 
 ### 6. Check for applicable skills
 
@@ -61,7 +69,7 @@ Consume `resolved_backend`, `dispatch_decision`, and `dispatch_result`. When `re
 
 Read `hive.config.yaml` → `execution.terminal_mux`. Values:
 
-- `tmux` (default): use TeamCreate/Agent which spawns tmux panes natively
+- `tmux` (default): use `Agent(name:)` which spawns tmux panes natively
 - `cmux`: spawn the agent in a cmux split pane via the cmux CLI
 - `auto`: check `which cmux` first; if available, use cmux; otherwise tmux
 
@@ -74,21 +82,89 @@ interactive mode or one-shot mode:
 - `false`: launch in one-shot mode (`claude -p` / `codex exec`). Agent
   receives one prompt, runs, exits. No follow-up messaging possible.
 
-#### 7.2 Agent/TeamCreate call (claude backend, tmux path)
+#### 7.2 `Agent(name:)` call (claude backend, tmux path)
 
-When `terminal_mux` resolves to `tmux`, use the standard Agent/TeamCreate call:
+When `terminal_mux` resolves to `tmux`, use the standard `Agent(name:)` call:
 
 ```
 Agent(
-  prompt: [persona_context.persona_text + story context + memories + skills + domain note],
+  prompt: [persona_context.persona_text + story context + memories + skills + domain note + completion contract],
   model: "{persona_context.frontmatter.model}",  // opus, sonnet, or haiku
   name: "{agent-name}-{story-id}",
   description: "{agent-name} working on {story-id}"
 )
 ```
+
+**Completion contract (tmux/`Agent(name:)` path only — E5 s1):** this is the
+only dispatch path `SubagentStop` fires for, and `hooks/notify-agent-complete.sh`
+derives its verdict solely from a self-written `<cwd>/.hive-task-status.json`
+marker (no exit-status field exists in the payload — see
+`.pHive/epics/e5-execution-loop/docs/design-discussion.md` §2, §4 R1). Append
+this instruction to the assembled task prompt so every tmux-dispatched agent
+writes the marker as its last action. Canonical source of this block:
+`hive/references/completion-contract.md` — the team-execution per-story
+template (`skills/execute/references/team-execution.md`) carries the same
+byte-identical block for named-teammate spawns; keep both copies in sync:
+
+```
+## Completion Contract
+Before you finish, as your LAST action, run exactly one of:
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" success
+  bash "${CLAUDE_PLUGIN_ROOT}/hooks/write-task-status.sh" failure
+Use "success" only if every acceptance criterion for this task was met and
+all required tests pass. Use "failure" otherwise. A missing marker is always
+read downstream as failure, never success — so skipping this step silently
+fails the story even if your work was correct.
+```
+
+Not required on the cmux path (no `SubagentStop` binding; completion is
+detected via the `[STORY-COMPLETE:{story-id}]` scrollback marker instead —
+see §7.3 step 11) or for Bash `run_in_background` dispatch (no completion
+hook exists for that path at all — carve-out, not fixed).
+
+**wr-5 investigation finding, REVISED round 1 (do not re-wire elsewhere):**
+`Agent(name:)` over the tmux backend is the ONLY *class* of spawn in the
+codebase that binds `SubagentStop` — but round 0 wrongly treated that as one
+prompt-assembly path. It is two: this section's solo spawn template, and the
+separate named-teammate template in
+`skills/execute/references/team-execution.md` (team-execution Step 6), which
+the runtime's natural-language auto-spawn model also dispatches over
+`Agent(name:)`/tmux. Round-1 fetched a real delivered team-execution prompt
+from the WFD campaign transcripts and found the contract text absent —
+team-execution.md's template never had it (fixed now; see that file). Two
+other production dispatch bindings look similar but are structurally out of
+reach the same way as cmux/bg, for a different reason (no tracked subagent,
+not just no hook registration):
+- `LocalAgentSpawn` (`hive/lib/dag_executor/executor/handlers/agent.py`)
+  shells `claude --print` as a one-shot top-level CLI process — it is never
+  an `Agent`-tool subagent of the calling session, so `SubagentStop` cannot
+  fire for it regardless of prompt content. Its `build_prompt()` does not
+  (and structurally could not usefully) append this contract.
+- `MulticaAgentSpawn` (same file) and `execute-mode-multica/SKILL.md` Step 2
+  dispatch to an independent Multica-managed session and poll the issue's
+  status via the Multica API (`pollTaskUntilTerminal`) — again a separate
+  top-level process, not a subagent, with its own completion signal entirely
+  unrelated to `.hive-task-status.json`.
+
+Verified against real production `complete.json`/`agent_spawn` metric rows
+(WFD E1-E10 campaign, 536/536 `verdict=failure`): every row's `cwd` is a
+plain project directory (never a worktree path, never absent), consistent
+only with `Agent(name:)` dispatch over tmux. Of those, the rows carrying real
+persona `agent_type` values (e.g. `e9-s1-developer`) — i.e. exactly the
+population this contract targets — were all named-teammate dispatches from
+team-execution.md's assembler, still 100% `verdict=failure`. Grepping a real
+delivered transcript for one of these rows confirmed the contract text was
+never in the prompt team-execution.md sent. The gap was therefore **wiring
+in team-execution.md's assembler, not honoring of this section's text** —
+this section's own template was never the one used for those 31 rows. Both
+assembly paths now carry the same canonical block
+(`hive/references/completion-contract.md`). wr-1's completion-record
+detector remains the visibility layer for the residual "agent honors the
+now-present instruction inconsistently" risk this epic does not further
+enforce (see grill-record.md H1-H3).
 #### 7.3 cmux pane spawn (claude backend, cmux path)
 When `terminal_mux` resolves to `cmux`, spawn the agent in a visible cmux
-split pane instead of using TeamCreate:
+split pane instead of using the `Agent` tool:
 1. **Pre-flight:** `which cmux` — if missing, fall back to tmux path with a
    warning (not a hard-fail; cmux is a visibility preference, not a backend).
 2. **Open pane:** `cmux new-split right` in the current workspace.
@@ -108,7 +184,7 @@ split pane instead of using TeamCreate:
    - Continuation context (respawn only)
    - Task — the story spec, step instructions, and inputs from prior steps
    This split matters: with `--append-system-prompt-file`, the persona is
-   injected as a system instruction with full authority. With TeamCreate/Agent,
+   injected as a system instruction with full authority. With `Agent(name:)`,
    the `prompt` parameter handled this implicitly. In cmux panes, we must be
    explicit — persona-as-user-message loses authority and agents drift.
 
@@ -154,7 +230,7 @@ split pane instead of using TeamCreate:
    and may mangle special characters.
    **Note:** cmux team execution (execute step 6b) requires `interactive_panes: true`.
    If the orchestrator detects `interactive_panes: false` with `terminal_mux: cmux`
-   and parallel stories, it should warn and fall back to TeamCreate (tmux path).
+   and parallel stories, it should warn and fall back to the `Agent(name:)` tmux path.
 7. **Clean up temp files** after delivery. Remove both `<persona-tempfile>` and
    `<task-tempfile>`.
 8. **Record in episode:** surface_id, terminal_mux: cmux, pane direction,
@@ -193,14 +269,15 @@ while skills, continuation context, and the task go as the first user message.
 Memory loading, skill injection, and respawn continuation are identical in
 content — only the injection point differs.
 **Prompt structure (shared by both paths):**
-For the **tmux path** (TeamCreate/Agent), all six parts are concatenated into
+For the **tmux path** (`Agent(name:)`), all six parts are concatenated into
 the single `prompt` parameter — the framework handles system-level injection:
 1. **Persona** — `persona_context.persona_text`
 2. **Domain note** — "You may modify files matching: {allow patterns}."
 3. **Prior knowledge** — relevant memories from the agent's memory directory
 4. **Applicable skills** — skill content if any matched
 5. **Continuation Context** (respawn only) — see step 7b below
-6. **Task** — the story spec, step instructions, and any inputs from prior steps
+6. **Task** — the story spec, step instructions, any inputs from prior steps,
+   and (tmux/`Agent(name:)` path only) the Completion Contract from §7.2
 For the **cmux path**, the same content is split across two injection points:
 *System prompt file* (via `--append-system-prompt-file`):
 1. **Persona** — `persona_context.persona_text`
@@ -239,11 +316,12 @@ If `respawn_summary_path` is NOT provided, skip this step entirely — behavior 
 
 After spawning, report:
 - Agent name and model tier used
-- Backend: claude (Agent/TeamCreate) | codex (cmux pane via codex-invoke)
-- Terminal mux: tmux (TeamCreate) | cmux (surface id: X)
+- Backend: claude (`Agent(name:)`) | codex (cmux pane via codex-invoke)
+- Terminal mux: tmux (`Agent(name:)`) | cmux (surface id: X)
 - Respawn: yes (iteration {N} of 3) | no (fresh spawn)
 - Required tools: `persona_context.validated_tools` available / missing (with fallback)
 - Memories loaded: count and names
+- Prior experience injected: yes/no (`memory_count`) — classic tmux path only; see §5 caveat
 - Skills injected: count and names
 - Continuation context: loaded from {path} | none
 - Domain restrictions communicated

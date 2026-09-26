@@ -5,9 +5,27 @@ Defines SSE stuck detection and session retry for Managed Agent session executio
 mechanisms that replace the respawn skill when sessions are active.
 
 **Respawn vs Session Retry:** The respawn skill (`skills/hive/skills/respawn/SKILL.md`)
-is for TeamCreate execution (step 6). When sessions are active (step 6c), use this
+is for respawn/v2.1.178 auto-spawn execution (step 6). When sessions are active (step 6c), use this
 document instead. Both mechanisms share the same goal — recover from degraded execution
 with minimal context loss — but the mechanics differ.
+
+## Stateless MCP Note
+
+The MCP stateless spec (effective 2026-07-28) removes the `initialize`/`initialized`
+handshake, the `Mcp-Session-Id` header, and sticky routing — every MCP request becomes
+self-contained. This document's stuck-detection and retry mechanics are unaffected: they
+operate on a different session concept entirely. To avoid conflating the two, the term
+"session" in this document always refers to one of the following:
+
+| Term | What it is | Tracked by |
+|------|-----------|------------|
+| **MCP transport session** | The `Mcp-Session-Id`-scoped connection between an MCP client and server, per the MCP spec. No code under `hive/` sets, sends, or reads this header — the only occurrences of the string under `hive/` are this taxonomy note, the bridge compat note, guard comments, and tests asserting its absence. | N/A (not present in this codebase) |
+| **Managed-Agent SSE session** | The Anthropic Managed Agent execution session opened via `/v1/sessions`, whose liveness this document monitors via SSE. This is what "session" means everywhere else in this doc. | `sse_last_event_at` in `${HIVE_STATE_DIR}/sessions/index.yaml` |
+| **Session retry** | The recovery mechanism below (Steps 1–4) that opens a new Managed-Agent SSE session with continuation context when the prior one goes stuck. | `status: stuck` → `status: pending` → `status: active` transitions in the same registry |
+
+SSE stuck detection (`sse_last_event_at` polling, below) is entirely independent of MCP
+transport sessions: it never reads or depends on `Mcp-Session-Id`, and the stateless MCP
+cutover requires no change to this document's detection or retry mechanics.
 
 ## SSE Stuck Detection
 
@@ -157,7 +175,7 @@ Activate the session and update its status to `active` once SSE events begin flo
 
 ## How Session Retry Differs from Respawn
 
-| Aspect | Respawn (TeamCreate) | Session Retry |
+| Aspect | Respawn (auto-spawn) | Session Retry |
 |--------|---------------------|---------------|
 | Trigger | Orchestrator detects quality degradation via behavioral signals | SSE silence exceeds stuck_timeout_ms |
 | Signal mechanism | `SendMessage` RESPAWN SIGNAL to old agent | No signal — orchestrator reads registry directly |
@@ -181,5 +199,5 @@ Controlled by `hive.config.yaml sessions.*` block (see `hive/references/configur
 - `hive/references/session-registry-schema.md` — `sse_last_event_at` field; status lifecycle including `stuck`
 - `skills/execute/SKILL.md` — step 6c resilience monitoring paragraph references this doc
 - `hive/references/configuration.md` — `sessions.stuck_timeout_ms` and `sessions.max_retries`
-- `skills/hive/skills/respawn/SKILL.md` — TeamCreate respawn; use that doc for step 6 execution
+- `skills/hive/skills/respawn/SKILL.md` — auto-spawn respawn; use that doc for step 6 execution
 - `hive/references/episode-schema.md` — episode records used to populate continuation context

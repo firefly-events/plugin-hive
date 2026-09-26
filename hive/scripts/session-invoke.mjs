@@ -146,7 +146,17 @@ async function main() {
   // 3. Build prompt content
   let content;
   try {
-    content = sessionPromptBuilder.buildPrompt({ story_context, epic_id, matched_specialists });
+    // PAN-7194: runner-agnostic memory parity — inject a small Mnemosyne recall
+    // bundle so NON-Claude runners (codex/kimi/gemini), which do not fire Claude
+    // Code hooks, still receive prior memory. Fail-open: a miss/error yields the
+    // plain buildPrompt() output unchanged.
+    // scope: from MNEMOSYNE_SCOPE env or the service default (payload carries no
+    // repo field). agent_role is a role name, not a memory collection scope.
+    content = await sessionPromptBuilder.buildPromptWithMemory({
+      story_context,
+      epic_id,
+      matched_specialists,
+    });
   } catch (err) {
     process.stderr.write(`ERROR: prompt builder failed: ${err.message}\n`);
     process.exit(1);

@@ -7,6 +7,13 @@
 > confuse the two: Hive tool-hooks intercept Claude tool calls; Sandcastle lifecycle hooks run
 > shell commands at container-setup milestones (worktree ready, sandbox ready). They serve
 > entirely different purposes and live at entirely different layers.
+>
+> **Disambiguation — `PostToolUse` `updatedToolOutput`:** The Claude Code `PostToolUse`
+> hook field `hookSpecificOutput.updatedToolOutput` (which rewrites a tool result) is a
+> **tool-hook** concept, **not** a Sandcastle lifecycle hook. It belongs to the `hooks/*.sh`
+> shim layer wired in `.claude-plugin/plugin.json`, not to the worktree/container lifecycle
+> described here. For its structure and conventions, see
+> `hive/references/hooks-conventions.md`. Nothing in this document configures it.
 
 ---
 

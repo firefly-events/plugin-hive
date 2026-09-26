@@ -1,9 +1,0 @@
-story: wmc-1-execute-multica-routing
-epic: wire-execute-multica-codex
-phase: integrate
-status: passed
-timestamp: 2026-05-25T19:55:11Z
-notes: |
-  Step 5 dispatch enum extended with 'multica -> step 6e'.
-  Step 6e block added parity-matching 6d (sandcastle) shape, inputs:
-  workflow_path, unblocked_stories[], appends_map, epic_handle, hive_config.

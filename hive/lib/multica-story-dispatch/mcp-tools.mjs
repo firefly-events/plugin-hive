@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { negotiateMcpProtocolVersion } from '../mcp-protocol-version.js';
 
 const execFileAsync = promisify(execFile);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -34,7 +35,8 @@ const TOOL_DEFINITIONS = [
     name: 'multica_dispatch_story',
     description:
       'Dispatch a story issue to an agent or squad. Returns {status, issue_id, task_id}. ' +
-      'status is "dispatched" on a new dispatch or "already_dispatched" on an idempotent call.',
+      'status is "dispatched" on a new dispatch, "already_dispatched" on an idempotent call, ' +
+      'or "redispatched" when rerun=true forced a fresh run on a spent (terminal-task) issue.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -49,6 +51,33 @@ const TOOL_DEFINITIONS = [
         squad_name: {
           type: 'string',
           description: 'Name of the squad to assign. Mutually exclusive with agent_name.',
+        },
+        integration_branch: {
+          type: 'string',
+          description:
+            'Epic branch the agent must work on and push back to (single-shared-branch contract). ' +
+            'When set, the issue body is updated with an Integration Contract instructing the agent to ' +
+            'check out this branch instead of the daemon default and push its commits so dependent ' +
+            'stories build on real prior work. Omit to keep legacy throwaway-branch behavior.',
+        },
+        story_id: {
+          type: 'string',
+          description: 'Story ID used in the integration contract commit-message template (optional).',
+        },
+        epic: {
+          type: 'string',
+          description:
+            'Epic handle used to scope the Prior Experience memory injection (optional). When agent_name ' +
+            'is set, the issue brief is stamped with the persona and augmented with any relevant prior ' +
+            'team-memory / knowledge-graph context for this epic before dispatch.',
+        },
+        rerun: {
+          type: 'boolean',
+          description:
+            'Force a fresh run when the issue already has a terminal task. Without this, dispatching a ' +
+            'spent issue (latest task completed/failed/cancelled) fails with STALE_TERMINAL_TASK rather ' +
+            'than silently no-opping. With rerun=true, the issue is reset to a clean dispatchable state ' +
+            'so the daemon spawns a new task; the result reports status "redispatched".',
         },
       },
       required: ['issue_id'],
@@ -270,6 +299,10 @@ async function invokeTool(name, args) {
       const flags = ['--issue', String(a.issue_id)];
       if (a.agent_name) flags.push('--agent', String(a.agent_name));
       if (a.squad_name) flags.push('--squad', String(a.squad_name));
+      if (a.integration_branch) flags.push('--integration-branch', String(a.integration_branch));
+      if (a.story_id) flags.push('--story-id', String(a.story_id));
+      if (a.epic) flags.push('--epic', String(a.epic));
+      if (a.rerun) flags.push('--rerun');
       return callCli('dispatch', flags);
     }
 
@@ -311,6 +344,8 @@ async function invokeTool(name, args) {
       return callCli('comment', ['--issue', String(a.issue_id), '--body', String(a.body)]);
 
     case 'multica_episode':
+      // Forwards to cli.mjs's `episode` subcommand, which enables insight
+      // distill by default (no flag needed) — see cmdEpisode.
       requireArgs(name, a, ['issue_id', 'epic', 'story']);
       return callCli('episode', [
         '--issue', String(a.issue_id),
@@ -328,6 +363,14 @@ async function invokeTool(name, args) {
 }
 
 // ── MCP JSON-RPC 2.0 transport ──────────────────────────────────────────────
+// Stateless MCP compat guard (PLU-542, epic mcp-stateless-behavior, cutover
+// 2026-07-28): handleRpcMessage below dispatches purely on `message.method`
+// per call and stores no session state. The `initialize` handler is a
+// spec-compliance flag, not a live handshake gate — tools/list and tools/call
+// work identically whether or not `initialize` was ever received. Do NOT add
+// session/connection state keyed off `initialize`, and do NOT add an
+// `Mcp-Session-Id` header or equivalent to this transport. See README.md
+// "Stateless MCP compat note" for the full audit.
 
 function writeMessage(msg) {
   process.stdout.write(`${JSON.stringify(msg)}\n`);
@@ -352,7 +395,7 @@ async function handleRpcMessage(message) {
         jsonrpc: '2.0',
         id: message.id,
         result: {
-          protocolVersion: message.params?.protocolVersion ?? '2024-11-05',
+          protocolVersion: negotiateMcpProtocolVersion(message.params?.protocolVersion),
           capabilities: { tools: {} },
           serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
         },

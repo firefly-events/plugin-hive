@@ -1,6 +1,0 @@
-step_id: test
-story_id: c-6-migration-guide-and-prose-runbook-deprecation
-epic_id: task-tracking-adapter-abi
-agent: tester
-status: completed
-verdict: 9/9 PASS (T8 markdownlint skipped — tool absent on host)

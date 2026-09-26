@@ -2,9 +2,11 @@
  * Terminal handoff dispatcher (story d-1-handoff-dispatch-and-execute-wire,
  * hardened in d-2-handoff-edge-cases).
  *
- * Invokes /test or /review as a child `claude --print` process after a story's
- * integrate step completes. Returns a structured verdict the caller writes into
- * cycle-state handoff_log[].
+ * Invokes /test or /review as a child `<runner> --print` process after a story's
+ * integrate step completes. The runner defaults to `claude` but is resolved by
+ * resolveHandoffRunner (env `HIVE_HANDOFF_RUNNER`/`CLAUDE_CMD` or config
+ * `execution.terminal_handoff.runner`), so the handoff is runner-agnostic.
+ * Returns a structured verdict the caller writes into cycle-state handoff_log[].
  *
  * Export surface:
  *   dispatchHandoff({ story_id, target, branch, pr_number?, timeout_ms?, state_dir?, run_id? })
@@ -28,6 +30,12 @@ const _require = createRequire(import.meta.url);
 const DEFAULT_TIMEOUT_MS = 1800 * 1000;
 const EVIDENCE_SUBDIR = 'handoff-evidence';
 
+// Default handoff runner. Historically the /test + /review handoff was hardcoded
+// to spawn `claude`; this constant keeps that as the default while making it
+// overridable so the handoff can run on any runner that accepts the
+// `--print <skillArgs>` CLI grammar (a Claude-compatible runner or wrapper).
+const DEFAULT_RUNNER = 'claude';
+
 // ---------------------------------------------------------------------------
 // Config reader — reads execution.terminal_handoff.timeout_seconds
 // ---------------------------------------------------------------------------
@@ -43,6 +51,49 @@ function getDefaultTimeoutMs() {
     // fall through to hardcoded default
   }
   return DEFAULT_TIMEOUT_MS;
+}
+
+// ---------------------------------------------------------------------------
+// Runner resolver — makes the /test + /review handoff runner-agnostic.
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the runner command used to invoke the /test and /review skills.
+ *
+ * Precedence (first non-empty wins):
+ *   1. explicit `runner` arg      — caller / CLI `--runner` override
+ *   2. env `HIVE_HANDOFF_RUNNER`  — operator override, scoped to the handoff
+ *   3. env `CLAUDE_CMD`           — shared runner-binary override (matches other backends)
+ *   4. config `execution.terminal_handoff.runner` in hive.config.yaml
+ *   5. DEFAULT_RUNNER ('claude')  — unchanged historical default
+ *
+ * Behaviour is identical to the old hardcoded path when nothing is configured:
+ * it returns 'claude'. Any override must accept the same `--print <skillArgs>`
+ * grammar (a Claude-compatible runner or a wrapper that adapts to codex/kimi/
+ * gemini). Full per-backend routing via resolveBackend/resolvePersonaBackend is
+ * a follow-up — see PR notes.
+ *
+ * @param {{ runner?: string, configPath?: string }} [opts]
+ * @returns {string} runner command (never empty)
+ */
+export function resolveHandoffRunner({ runner, configPath } = {}) {
+  const explicit = typeof runner === 'string' ? runner.trim() : '';
+  if (explicit) return explicit;
+
+  const envRunner = (process.env.HIVE_HANDOFF_RUNNER || process.env.CLAUDE_CMD || '').trim();
+  if (envRunner) return envRunner;
+
+  try {
+    const { readConfigFile } = _require('../config.js');
+    const path = configPath || join(process.cwd(), 'hive.config.yaml');
+    const cfg = readConfigFile(path);
+    const cfgRunner = cfg?.execution?.terminal_handoff?.runner;
+    if (typeof cfgRunner === 'string' && cfgRunner.trim()) return cfgRunner.trim();
+  } catch {
+    // fall through to default
+  }
+
+  return DEFAULT_RUNNER;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,11 +200,14 @@ function extractReviewVerdict(output) {
 // ---------------------------------------------------------------------------
 
 /**
- * Spawn `claude --print <skillArgs>` with a wall-clock timeout.
+ * Spawn `<runnerCmd> --print <skillArgs>` with a wall-clock timeout.
+ * `runnerCmd` defaults to 'claude' (historical behaviour) but is resolved by
+ * resolveHandoffRunner so operators can point the handoff at another runner.
+ * `_spawn` is an injectable test seam (defaults to node's spawnSync).
  * Returns { exitCode, stdout, stderr, timedOut }.
  */
-function spawnClaude(skillArgs, timeoutMs) {
-  const result = spawnSync('claude', ['--print', ...skillArgs], {
+function spawnRunner(skillArgs, timeoutMs, runnerCmd = DEFAULT_RUNNER, _spawn = spawnSync) {
+  const result = _spawn(runnerCmd, ['--print', ...skillArgs], {
     timeout: timeoutMs,
     encoding: 'utf8',
     maxBuffer: 10 * 1024 * 1024, // 10 MB
@@ -169,8 +223,8 @@ function spawnClaude(skillArgs, timeoutMs) {
 /**
  * Run a single skill invocation. Returns { ok, verdict, rawOutput, timedOut? }.
  */
-function runSkill(skillArgs, timeoutMs, extractVerdict) {
-  const child = spawnClaude(skillArgs, timeoutMs);
+function runSkill(skillArgs, timeoutMs, extractVerdict, runnerCmd = DEFAULT_RUNNER, _spawn = spawnSync) {
+  const child = spawnRunner(skillArgs, timeoutMs, runnerCmd, _spawn);
   if (child.timedOut) {
     return { ok: false, verdict: 'timeout', rawOutput: child.stdout + child.stderr, reason: 'timeout', timedOut: true };
   }
@@ -180,7 +234,7 @@ function runSkill(skillArgs, timeoutMs, extractVerdict) {
       ok: false,
       verdict: 'error',
       rawOutput,
-      reason: `claude exited with code ${child.exitCode}`,
+      reason: `${runnerCmd} exited with code ${child.exitCode}`,
     };
   }
   const verdict = extractVerdict(rawOutput);
@@ -213,6 +267,8 @@ function writeEvidence(stateDir, storyId, target, content) {
  * @param {number=} opts.timeout_ms   Wall-clock limit per sub-invocation. Default: execution.terminal_handoff.timeout_seconds from hive.config.yaml, or 1800 s.
  * @param {string=} opts.state_dir    State-dir path for evidence writes. Default: Q2 resolver (HIVE_STATE_DIR env > root-config paths.state_dir > '.pHive').
  * @param {string=} opts.run_id       Opaque label included in evidence filename.
+ * @param {string=} opts.runner       Runner command override. Default: resolveHandoffRunner (env > config > 'claude').
+ * @param {Function=} opts._spawnSync Injectable spawn seam (tests). Default: node spawnSync.
  * @returns {{ ok: true, verdict: string, evidence_ref: string, duration_ms: number }
  *          |{ ok: false, reason: string, duration_ms: number, timeout_at?: string }}
  */
@@ -226,11 +282,16 @@ export async function dispatchHandoff({
   // resolver runs only when the caller passes nothing.
   state_dir = resolveStateDir(),
   run_id = '',
+  runner,
+  _spawnSync = spawnSync,
 }) {
   // Resolve timeout: caller override → config file → hardcoded default (1800 s)
   const resolvedTimeout = (typeof timeout_ms === 'number' && timeout_ms > 0)
     ? timeout_ms
     : getDefaultTimeoutMs();
+
+  // Resolve runner: caller/CLI override → env → config → 'claude' (unchanged default)
+  const runnerCmd = resolveHandoffRunner({ runner });
 
   if (target === 'none') {
     return { ok: true, verdict: 'skipped', evidence_ref: '', duration_ms: 0 };
@@ -240,7 +301,7 @@ export async function dispatchHandoff({
 
   if (target === 'test') {
     const args = ['/test', '--story', story_id];
-    const result = runSkill(args, resolvedTimeout, extractTestVerdict);
+    const result = runSkill(args, resolvedTimeout, extractTestVerdict, runnerCmd, _spawnSync);
     const duration_ms = Date.now() - started;
     if (result.timedOut) {
       const timeout_at = new Date().toISOString();
@@ -263,7 +324,7 @@ export async function dispatchHandoff({
       console.warn(`[handoff] no PR found for branch ${branch} — falling back to /review ${branch} (git diff main..${branch})`);
     }
     const args = ['/review', reviewArg];
-    const result = runSkill(args, resolvedTimeout, extractReviewVerdict);
+    const result = runSkill(args, resolvedTimeout, extractReviewVerdict, runnerCmd, _spawnSync);
     const duration_ms = Date.now() - started;
     if (result.timedOut) {
       const timeout_at = new Date().toISOString();
@@ -280,7 +341,7 @@ export async function dispatchHandoff({
   if (target === 'both') {
     // Test first, then review with test verdict available to reviewer
     const testArgs = ['/test', '--story', story_id];
-    const testResult = runSkill(testArgs, resolvedTimeout, extractTestVerdict);
+    const testResult = runSkill(testArgs, resolvedTimeout, extractTestVerdict, runnerCmd, _spawnSync);
     if (testResult.timedOut) {
       const duration_ms = Date.now() - started;
       const timeout_at = new Date().toISOString();
@@ -303,7 +364,7 @@ export async function dispatchHandoff({
     const reviewArgs = testResult.ok
       ? ['/review', reviewArg, '--context', `test-verdict:${testResult.verdict}`]
       : ['/review', reviewArg];
-    const reviewResult = runSkill(reviewArgs, resolvedTimeout, extractReviewVerdict);
+    const reviewResult = runSkill(reviewArgs, resolvedTimeout, extractReviewVerdict, runnerCmd, _spawnSync);
     const duration_ms = Date.now() - started;
 
     if (reviewResult.timedOut) {
@@ -348,21 +409,22 @@ export async function dispatchHandoff({
 // ---------------------------------------------------------------------------
 // CLI entry point
 // ---------------------------------------------------------------------------
-// Usage: node dispatch.mjs <story_id> <target> <branch> [--pr-number N] [--timeout-ms N] [--state-dir PATH]
+// Usage: node dispatch.mjs <story_id> <target> <branch> [--pr-number N] [--timeout-ms N] [--state-dir PATH] [--runner CMD]
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   const [, , story_id, target, branch, ...rest] = process.argv;
   if (!story_id || !target || !branch) {
-    console.error('Usage: node dispatch.mjs <story_id> <target> <branch> [--pr-number N] [--timeout-ms N] [--state-dir PATH]');
+    console.error('Usage: node dispatch.mjs <story_id> <target> <branch> [--pr-number N] [--timeout-ms N] [--state-dir PATH] [--runner CMD]');
     process.exit(1);
   }
-  let pr_number, timeout_ms, state_dir;
+  let pr_number, timeout_ms, state_dir, runner;
   for (let i = 0; i < rest.length; i++) {
     if (rest[i] === '--pr-number' && rest[i + 1]) pr_number = Number(rest[++i]);
     if (rest[i] === '--timeout-ms' && rest[i + 1]) timeout_ms = Number(rest[++i]);
     if (rest[i] === '--state-dir' && rest[i + 1]) state_dir = rest[++i];
+    if (rest[i] === '--runner' && rest[i + 1]) runner = rest[++i];
   }
-  const result = await dispatchHandoff({ story_id, target, branch, pr_number, timeout_ms, state_dir });
+  const result = await dispatchHandoff({ story_id, target, branch, pr_number, timeout_ms, state_dir, runner });
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.ok ? 0 : 1);
 }

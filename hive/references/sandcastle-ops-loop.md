@@ -79,6 +79,32 @@ A consumer wiring this in their own repo needs all of:
 | Branch convention | One branch per epic (`feat/<epic-id>`), one commit per story. Worker uses `agent/issue-<n>` for its working branch. |
 | Worker re-reads canonical YAML | Issue body is a snapshot, not source of truth. The S2 prompt re-reads `.pHive/epics/<epic>/stories/<story>.yaml` from the checked-out workspace before implementing. |
 
+## Stateless server
+
+The worker process is treated as disposable/restartable. Tool and agent state must be written to `.pHive/` (or the configured state dir), not held in the server process's memory — a restart must not lose in-flight state.
+
+## Headless / SSH MCP auth
+
+**Claude Code CLI feature — not a Hive config settings key.** This is an ops/auth
+note for operators running MCP servers over SSH or otherwise headless; it has no
+`hive.config.yaml` surface and is unrelated to the config keys below.
+
+- `claude mcp login <name> --no-browser` runs a configured MCP server's OAuth flow
+  from the shell without opening `/mcp`, and forces the CLI to print the
+  authorization URL instead of attempting to launch a local browser. Open that URL
+  on a machine with a browser, then paste the redirect URL back at the prompt. The
+  paste step needs a real interactive terminal — connect the SSH session with
+  `ssh -t` (or use SSH port forwarding to the callback port the CLI reports) rather
+  than piping stdin; unattended/non-interactive automation of this flow is not
+  documented upstream. For CI/CD or fully non-interactive environments, prefer API
+  key auth instead of this OAuth flow.
+- `claude mcp logout <name>` clears the stored OAuth credentials for that server.
+
+`validated_date: 2026-07-03` — re-verified against current official Claude Code CLI
+docs (code.claude.com/docs/en/mcp) and current community references at this story's
+implement step; not merely inherited from the architect's earlier point-in-time
+check.
+
 ## Key config keys
 
 | Key | Where | Purpose |

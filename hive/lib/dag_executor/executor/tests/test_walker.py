@@ -6,12 +6,17 @@ import pytest
 
 from hive.lib.dag_executor.executor.dispatcher import Dispatcher
 from hive.lib.dag_executor.executor.errors import (
+    FatalAgentHandlerError,
     HandlerError,
     WalkerCycleError,
 )
 from hive.lib.dag_executor.executor.handlers import NodeOutput
 from hive.lib.dag_executor.executor.telemetry import Telemetry
-from hive.lib.dag_executor.executor.walker import Walker, _topological_order
+from hive.lib.dag_executor.executor.walker import (
+    Walker,
+    _dispatch_with_retry,
+    _topological_order,
+)
 from hive.lib.dag_executor.graph import (
     ConditionalEdge,
     Graph,
@@ -145,6 +150,56 @@ def test_optional_step_failure_continues_walk():
     assert "node_failed" in _emit_types(tel)
 
 
+def test_fatal_agent_handler_error_halts_even_on_optional_node():
+    """s4-null-spec-fail-loud-guard AC-3: a FatalAgentHandlerError (raised for
+    a null/empty story_spec) must stop the graph before any downstream node
+    runs, even when the guarded node is `optional` — the plain HandlerError
+    optional-recovery path must NOT swallow it.
+    """
+
+    def handler(node, inputs, run_id):
+        if node.id == "a":
+            raise FatalAgentHandlerError(
+                "story_spec is null/empty for story=s4-null-spec-fail-loud-guard "
+                "— refusing to dispatch a spec-less agent"
+            )
+        return NodeOutput(outputs={"ok": True})
+
+    a = _agent_node("a", optional=True)
+    b = _agent_node("b", depends_on=["a"])
+    g = _graph_with([a, b])
+    tel = Telemetry(run_id="rid-1")
+    with pytest.raises(FatalAgentHandlerError):
+        Walker().walk(g, Dispatcher(handlers={NodeType.AGENT: handler}), "rid-1", tel)
+    events_for_b = [e for e in tel.events if e["step_id"] == "b"]
+    assert events_for_b == [], (
+        f"node b must never be dispatched after a fatal guard failure: {events_for_b}"
+    )
+
+
+def test_fatal_agent_handler_error_is_not_retried():
+    attempts = 0
+
+    def handler(node, inputs, run_id):
+        nonlocal attempts
+        attempts += 1
+        raise FatalAgentHandlerError("story_spec is null/empty")
+
+    node = _agent_node("a", retry={"max_attempts": 3})
+    dispatcher = Dispatcher(handlers={NodeType.AGENT: handler})
+
+    with pytest.raises(FatalAgentHandlerError):
+        _dispatch_with_retry(
+            dispatcher,
+            node,
+            {},
+            "rid-fatal-no-retry",
+            Telemetry(run_id="rid-fatal-no-retry"),
+        )
+
+    assert attempts == 1
+
+
 def test_required_step_failure_propagates():
     def handler(node, inputs, run_id):
         raise HandlerError("boom")
@@ -156,12 +211,69 @@ def test_required_step_failure_propagates():
     assert "node_failed" in _emit_types(tel)
 
 
-def test_skip_when_present_emits_node_skipped():
-    """skip_when predicate evaluation is hde-3a; presence triggers skip."""
+def test_skip_when_non_parseable_fails_closed_to_run():
+    """skip_when with a non-parseable predicate fails-closed-to-run (not Skipped).
+
+    s3-convergence-signal: skip_when is now evaluated as a routing grammar
+    predicate. Fail-closed-to-RUN semantics: if the predicate cannot be parsed
+    (e.g. a bareword like 'some_predicate' that is not a dotpath reference),
+    the node RUNS rather than being silently skipped. This is the inverse of
+    `when:` fail-closed semantics — we must never drop a round that hasn't
+    converged. A predicate_evaluated event with fail_closed=True is emitted.
+    """
     g = _graph_with([_agent_node("a", skip_when="some_predicate")])
     tel = Telemetry(run_id="rid-1")
-    Walker().walk(g, _stub_dispatcher({}), "rid-1", tel)
-    assert _emit_types(tel) == ["node_skipped"]
+    Walker().walk(g, _stub_dispatcher({"a": {}}), "rid-1", tel)
+    types = _emit_types(tel)
+    # Node must run (not be skipped): events include node_started + node_completed
+    assert "node_completed" in types, (
+        f"Node with non-parseable skip_when must run (fail-closed-to-run); "
+        f"got events: {types}"
+    )
+    assert "node_skipped" not in types, (
+        f"Node with non-parseable skip_when must NOT be skipped; got events: {types}"
+    )
+    # predicate_evaluated event with fail_closed=True must be emitted
+    pred_events = [e for e in tel.events if e["event_type"] == "predicate_evaluated"]
+    assert pred_events, "predicate_evaluated event must be emitted for skip_when evaluation"
+    fail_closed_events = [e for e in pred_events if e.get("payload", {}).get("fail_closed")]
+    assert fail_closed_events, (
+        "predicate_evaluated event must carry fail_closed=True for non-parseable skip_when"
+    )
+
+
+def test_skip_when_grammar_legal_true_emits_node_skipped():
+    """skip_when with a grammar-legal predicate that evaluates True → node is Skipped.
+
+    s3-convergence-signal: when the upstream node produces the convergence signal
+    (e.g. review_passed=True), the skip_when predicate evaluates True and the
+    downstream round node is Skipped (not run).
+    """
+    from hive.lib.dag_executor.graph import ConditionalEdge, OutputRef
+
+    # upstream produces review_passed=True
+    upstream = _agent_node("upstream", outputs=[OutputRef(name="review_passed", type="json")])
+    # candidate has skip_when referencing upstream's output
+    candidate = _agent_node(
+        "candidate",
+        depends_on=["upstream"],
+        skip_when="$upstream.output.review_passed == true",
+    )
+    g = _graph_with([upstream, candidate])
+    tel = Telemetry(run_id="rid-sk")
+
+    # upstream emits review_passed=True → candidate should be Skipped
+    Walker().walk(g, _stub_dispatcher({"upstream": {"review_passed": True}}), "rid-sk", tel)
+
+    # Check candidate-specific events (step_id == "candidate")
+    candidate_events = [e for e in tel.events if e.get("step_id") == "candidate"]
+    candidate_types = [e["event_type"] for e in candidate_events]
+    assert "node_skipped" in candidate_types, (
+        f"candidate must emit node_skipped when skip_when is True; got: {candidate_types}"
+    )
+    assert "node_completed" not in candidate_types, (
+        f"candidate must NOT complete when skip_when is True; got: {candidate_types}"
+    )
 
 
 def test_every_emitted_event_carries_run_id():
@@ -463,6 +575,81 @@ def test_parallel_implement_wave_reconciles_serially_without_corruption(tmp_path
     assert review_saw == {"backend": True, "frontend": True}, (
         "review must see both sentinels with uncorrupted content after reconcile"
     )
+
+
+def test_failed_reconcile_in_wave_halts_run_not_hollow_green():
+    """A non-optional RECONCILE node that raises inside a parallel wave must HALT
+    the run (fatal), NOT degrade to SKIPPED.
+
+    Regression: when reconcile-backend raised in a wave (bad branch ref /
+    non-ff), hde-4 branch semantics downgraded it to SKIPPED. Its join-dependent
+    downstream (test/gate/review/integrate) then skipped on the trigger rule and
+    the run reported status=completed with NOTHING integrated — a hollow green
+    that a driver reads as success. A reconcile is a barrier like a gate; its
+    failure must surface loudly.
+    """
+    import pytest
+
+    def agent_handler(node, inputs, run_id):
+        return NodeOutput(outputs={"commit_sha": f"{node.id}-sha", "work_dir": ""})
+
+    def reconcile_handler(node, inputs, run_id):
+        raise RuntimeError("ff-merge failed: bad branch ref agent/researcher/xyz")
+
+    nodes = [
+        Node(id="seed", agent="developer", node_type=NodeType.AGENT),
+        # reconcile-backend + sib both ready off seed → one parallel wave.
+        Node(id="reconcile-backend", agent="reconciler",
+             node_type=NodeType.RECONCILE, depends_on=["seed"]),
+        Node(id="sib", agent="developer", node_type=NodeType.AGENT,
+             depends_on=["seed"]),
+        Node(id="review", agent="reviewer", node_type=NodeType.AGENT,
+             depends_on=["reconcile-backend", "sib"]),
+    ]
+    g = _graph_with(nodes)
+    dispatcher = Dispatcher(handlers={
+        NodeType.AGENT: agent_handler,
+        NodeType.RECONCILE: reconcile_handler,
+    })
+    with pytest.raises(RuntimeError, match="ff-merge failed"):
+        Walker().walk(
+            g, dispatcher, "rid-reconcile-fatal",
+            Telemetry(run_id="rid-reconcile-fatal"),
+        )
+
+
+def test_fatal_agent_handler_error_in_parallel_wave_halts_run():
+    """A fatal agent guard must survive the parallel scheduler's branch
+    isolation semantics, even when the guarded node is optional.
+    """
+    dispatched: list[str] = []
+
+    def handler(node, inputs, run_id):
+        dispatched.append(node.id)
+        if node.id == "guarded":
+            raise FatalAgentHandlerError(
+                "story_spec is null/empty for story=s4-null-spec-fail-loud-guard"
+            )
+        return NodeOutput(outputs={"ok": True})
+
+    nodes = [
+        _agent_node("seed"),
+        _agent_node("guarded", depends_on=["seed"], optional=True),
+        _agent_node("sibling", depends_on=["seed"]),
+        _agent_node("downstream", depends_on=["guarded", "sibling"]),
+    ]
+
+    with pytest.raises(FatalAgentHandlerError, match="story_spec is null/empty"):
+        Walker().walk(
+            _graph_with(nodes),
+            Dispatcher(handlers={NodeType.AGENT: handler}),
+            "rid-parallel-fatal",
+            Telemetry(run_id="rid-parallel-fatal"),
+        )
+
+    assert "guarded" in dispatched
+    assert "sibling" in dispatched
+    assert "downstream" not in dispatched
 
 
 def test_per_node_reconcile_is_idempotent_on_already_merged_tree(tmp_path):

@@ -1,7 +1,7 @@
 ---
 name: accessibility-specialist
 description: "Remediates code-level accessibility issues: ARIA attributes, keyboard navigation, focus management, and contrast compliance."
-model: sonnet
+model: claude-sonnet-5
 color: cyan
 knowledge:
   - path: ~/.claude/hive/memories/accessibility-specialist/

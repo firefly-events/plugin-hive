@@ -15,7 +15,7 @@ No `$ARGUMENTS` required.
 
 ## When NOT to Use
 
-- When running TeamCreate execution (step 6) — no session registry needed
+- When running `Agent(name:)` execution (step 6) — no session registry needed
 - For meta-team cycles (they do not use session execution)
 
 ## Procedure

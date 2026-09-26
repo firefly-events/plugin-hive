@@ -14,11 +14,9 @@
  *     Messages-API loop and the Sessions-API cloud adapter.
  */
 
-'use strict';
-
-const path = require('path');
-const os = require('os');
-const { execSync } = require('child_process');
+import path from 'node:path';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
 
 const MAX_CHARS = 4000;
 const KG_SQLITE_PATH = path.join(os.homedir(), '.claude', 'hive', 'kg.sqlite');
@@ -303,10 +301,172 @@ function buildSystemPrompt({
   return { system };
 }
 
-module.exports = {
+// ─── Mnemosyne memory injection (PAN-7194) ──────────────────────────────────
+// Claude runners receive prior memory via the merged mnemosyne pre-recall HOOK
+// (settings.hooks.json). NON-Claude runners (codex/kimi/gemini) do NOT fire
+// Claude Code hooks — they assemble their first-message prompt HERE. To give
+// every runner runner-agnostic parity, buildPromptWithMemory() appends a small,
+// size-capped, DISCRETE "## Recalled Memory" block to the end of the standard
+// buildPrompt() output. It is:
+//   - cache-safe: appended as its own trailing block; story_context and the
+//     KG block are never reordered.
+//   - size-capped: MEMORY_BUNDLE_MAX_CHARS (small delta, not whole files).
+//   - fail-open: a recall miss OR a down/unreachable service is NOT a failure —
+//     the block is silently skipped and the plain buildPrompt() output returns.
+//
+// Transport mirrors mnemosyne/hooks/lib/mnemo-client.mjs recall() HTTP path:
+// POST {MNEMOSYNE_URL}/recall with { query, scope, hits }. Inlined here (rather
+// than importing the cross-repo ESM .mjs) so this CommonJS module stays
+// self-contained and dependency-free.
+
+const MNEMOSYNE_URL = process.env.MNEMOSYNE_URL || 'http://127.0.0.1:8477';
+const MEMORY_BUNDLE_MAX_CHARS = Number(process.env.HIVE_MEMORY_BUNDLE_MAX_CHARS || 1500);
+const MEMORY_HTTP_TIMEOUT_MS = Number(process.env.MNEMOSYNE_HTTP_TIMEOUT_MS || 8000);
+const MEMORY_EXCERPT_CHARS = 200;
+const MEMORY_DEFAULT_HITS = 5;
+
+/**
+ * Reach the Mnemosyne service over HTTP and return its native recall shape
+ * ({ total_hits, scopes: [{ scope, hits: [...] }] }). NEVER throws — any error
+ * (service down, timeout, non-2xx, bad JSON) resolves to an empty result so the
+ * caller falls open. Mirrors mnemo-client.mjs recall() service path.
+ *
+ * @param {string} query
+ * @param {string} [scope]
+ * @param {Object} [opts]
+ * @param {number} [opts.hits]
+ * @param {boolean} [opts.escalate]
+ * @returns {Promise<{total_hits:number, scopes:Array}>}
+ */
+async function recallMemory(query, scope, opts = {}) {
+  if (!query || typeof fetch !== 'function') return { total_hits: 0, scopes: [] };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), MEMORY_HTTP_TIMEOUT_MS);
+  try {
+    const res = await fetch(MNEMOSYNE_URL + '/recall', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        query: String(query),
+        scope: scope || undefined,
+        hits: opts.hits || MEMORY_DEFAULT_HITS,
+        escalate: !!opts.escalate,
+      }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) return { total_hits: 0, scopes: [] };
+    const json = await res.json();
+    return json && Array.isArray(json.scopes) ? json : { total_hits: 0, scopes: [] };
+  } catch {
+    return { total_hits: 0, scopes: [] };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Derive a compact recall query from the story spec: the first non-empty line
+ * (markdown heading markers stripped), else the leading slice. Capped so we
+ * send a topic, not the whole spec.
+ * @param {string} storyContext
+ * @returns {string}
+ */
+function deriveMemoryQuery(storyContext) {
+  const text = String(storyContext || '').trim();
+  if (!text) return '';
+  const firstLine = text.split('\n').map((l) => l.trim()).find(Boolean) || '';
+  const base = firstLine.replace(/^#+\s*/, '').trim() || text;
+  return base.slice(0, REFERENCE_TRUNCATE_CHARS);
+}
+
+/**
+ * Render a recall result into a small pointer bundle (NOT whole files): one
+ * line per hit with layer, confidence, source, optional line-range and a short
+ * excerpt. Deduped, score-ordered, and hard-capped at maxChars. Returns '' on
+ * a miss so the caller can skip the section entirely.
+ * @param {{scopes:Array}} recallResult
+ * @param {number} [maxChars]
+ * @returns {string}
+ */
+function formatMemoryBundle(recallResult, maxChars = MEMORY_BUNDLE_MAX_CHARS) {
+  if (!recallResult || !Array.isArray(recallResult.scopes)) return '';
+  const hits = [];
+  const seen = new Set();
+  for (const s of recallResult.scopes) {
+    for (const h of (s.hits || [])) {
+      const key = `${h.full_path || h.source || h.location || ''}#${h.chunk_index ?? (Array.isArray(h.chunk_span) ? h.chunk_span.join('-') : '')}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      hits.push({ ...h, layer: s.scope || h.collection || '?' });
+    }
+  }
+  if (!hits.length) return '';
+  hits.sort((a, b) => {
+    const ak = a.match_type === 'keyword' ? 1 : 0;
+    const bk = b.match_type === 'keyword' ? 1 : 0;
+    if (ak !== bk) return bk - ak; // keyword-exact first
+    return (b.score || 0) - (a.score || 0);
+  });
+
+  const lines = [];
+  for (const h of hits) {
+    const src = h.source || h.full_path || h.location || '(unknown)';
+    const span = Array.isArray(h.chunk_span) && h.chunk_span.length === 2
+      ? ` lines ${h.chunk_span[0]}-${h.chunk_span[1]}` : '';
+    const conf = h.match_type === 'keyword'
+      ? 'keyword-exact'
+      : (h.score != null ? `score ${Number(h.score).toFixed(2)}` : 'score ?');
+    let entry = `- [${h.layer} · ${conf}] ${src}${span}`;
+    const ex = String(h.text || '').replace(/\s+/g, ' ').trim();
+    if (ex) entry += `\n  > ${ex.slice(0, MEMORY_EXCERPT_CHARS)}`;
+    const candidate = lines.length ? lines.join('\n') + '\n' + entry : entry;
+    if (candidate.length > maxChars) break; // hard size cap
+    lines.push(entry);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Runner-agnostic prompt builder: the standard buildPrompt() output PLUS a
+ * trailing, size-capped "## Recalled Memory" block sourced from Mnemosyne.
+ * This is what NON-Claude runners use so they reach parity with Claude's
+ * hook-injected memory.
+ *
+ * story_context validation still throws (via buildPrompt) so callers keep their
+ * existing required-field behavior. The memory fetch itself NEVER throws: a miss
+ * or an error falls open to the plain buildPrompt() string.
+ *
+ * @param {Object} params  same shape as buildPrompt(): { story_context, epic_id, matched_specialists }
+ * @param {Object} [opts]
+ * @param {string} [opts.scope]   mnemosyne scope (else MNEMOSYNE_SCOPE / service default)
+ * @param {number} [opts.hits]
+ * @param {number} [opts.maxChars]
+ * @param {Function} [opts.recall]  injectable recaller (for tests); defaults to recallMemory
+ * @returns {Promise<string>}
+ */
+async function buildPromptWithMemory(params, opts = {}) {
+  const base = buildPrompt(params); // sync, unchanged; validates story_context (may throw)
+  const recall = opts.recall || recallMemory;
+  try {
+    const query = deriveMemoryQuery(params && params.story_context);
+    if (!query) return base;
+    const scope = opts.scope || (params && params.scope) || process.env.MNEMOSYNE_SCOPE || undefined;
+    const result = await recall(query, scope, { hits: opts.hits || MEMORY_DEFAULT_HITS });
+    const bundle = formatMemoryBundle(result, opts.maxChars || MEMORY_BUNDLE_MAX_CHARS);
+    if (!bundle) return base; // a memory miss is NOT a failure
+    return `${base}\n\n## Recalled Memory\n${bundle}`;
+  } catch {
+    return base; // never let memory recall break prompt assembly
+  }
+}
+
+
+// exposed for unit-level reuse + future spec-test additions (isAllowlistedEntity)
+export {
   buildPrompt,
+  buildPromptWithMemory,
+  recallMemory,
   queryDecisions,
   buildSystemPrompt,
-  // exposed for unit-level reuse + future spec-test additions
   isAllowlistedEntity,
 };

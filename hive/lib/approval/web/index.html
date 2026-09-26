@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Approval Actions — fallback dashboard</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+  h1 { font-size: 1.25rem; }
+  .note { color: #666; font-size: 0.85rem; margin-bottom: 1.5rem; }
+  nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #ccc; }
+  nav button { background: none; border: none; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.95rem; border-bottom: 2px solid transparent; }
+  nav button.active { border-bottom-color: #2563eb; font-weight: 600; }
+  .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; }
+  .card h3 { margin: 0 0 0.25rem 0; font-size: 1rem; }
+  .meta { color: #666; font-size: 0.8rem; margin-bottom: 0.75rem; }
+  .badge { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.75rem; background: #eee; margin-right: 0.25rem; }
+  .badge.allowed { background: #dcfce7; color: #166534; }
+  .badge.denied { background: #fee2e2; color: #991b1b; }
+  .badge.veto { background: #fef3c7; color: #92400e; }
+  textarea { width: 100%; min-height: 4rem; font-family: monospace; font-size: 0.85rem; box-sizing: border-box; }
+  input[type=text] { width: 100%; box-sizing: border-box; padding: 0.35rem; margin-bottom: 0.5rem; }
+  button.action { padding: 0.35rem 0.9rem; border-radius: 6px; border: 1px solid #ccc; cursor: pointer; margin-right: 0.5rem; }
+  button.approve { background: #16a34a; color: white; border-color: #16a34a; }
+  button.reject { background: #dc2626; color: white; border-color: #dc2626; }
+  button.submit-json { background: #2563eb; color: white; border-color: #2563eb; }
+  pre { background: #f5f5f5; padding: 0.5rem; border-radius: 6px; overflow-x: auto; font-size: 0.8rem; }
+  .empty { color: #888; font-style: italic; }
+  #status { position: fixed; top: 1rem; right: 1rem; padding: 0.5rem 1rem; border-radius: 6px; display: none; }
+  #status.ok { background: #dcfce7; color: #166534; display: block; }
+  #status.err { background: #fee2e2; color: #991b1b; display: block; }
+</style>
+</head>
+<body>
+  <h1>Approval Actions — fallback dashboard</h1>
+  <p class="note">
+    Plain web fallback for platforms without the Multica dashboard micro-frontend (DOS-221).
+    Talks directly to this server's <code>/api/approvals/*</code> JSON API — same store the
+    Multica dashboard and the MCP surface read and write. This page never asks for or stores
+    secrets/credentials; it only records approve/reject decisions.
+  </p>
+
+  <div id="status"></div>
+
+  <nav>
+    <button id="tab-pending" class="active" onclick="showTab('pending')">Pending</button>
+    <button id="tab-history" onclick="showTab('history')">History</button>
+  </nav>
+
+  <section id="view-pending"></section>
+  <section id="view-history" style="display:none"></section>
+
+  <script src="app.js"></script>
+</body>
+</html>

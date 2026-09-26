@@ -28,6 +28,17 @@ class AgentHandlerError(HandlerError):
     """The agent handler failed to invoke the agent-spawn chain."""
 
 
+class FatalAgentHandlerError(AgentHandlerError):
+    """A dispatch-time failure that must halt the graph unconditionally.
+
+    Unlike a plain `AgentHandlerError`, the walker's optional-node recovery
+    path (`node.optional=True` swallows `HandlerError` and continues) does
+    NOT apply here — s4-null-spec-fail-loud-guard requires a missing
+    story_spec to stop the graph even when the guarded node is optional, so
+    a spec-less agent can never be fabricated by a downstream node.
+    """
+
+
 class ScriptHandlerError(HandlerError):
     """Script handler subprocess failed or exceeded its timeout."""
 
@@ -84,4 +95,14 @@ class BackendIsolationViolationError(ToolGatingError):
     A step-level `tools: [codex]` override on a verifier persona
     silently re-routes the verifier through the same backend it is
     meant to verify — this exception blocks that path.
+    """
+
+
+class LoopNodeInvariantError(ExecutorError):
+    """A LOOP node reached the executor walker post-expander.
+
+    LOOP is an authoring-only keyword consumed by the load-time expander.
+    No LOOP node should ever reach the executor after the unroll pass.
+    Re-plan the workflow through the loader to unroll the LOOP node before
+    execution.
     """
